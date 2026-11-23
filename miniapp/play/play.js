@@ -5,11 +5,13 @@ const rarityGroups=[['M','Мифические'],['L','Легендарные'],
 const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
+const grants=[...document.querySelectorAll('[data-grant]')];
+const testPanel=$('testPanel');
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const day=86400;
-let state, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false;
+let state, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -21,7 +23,10 @@ async function api(path,data){
  if(!res.ok)throw Object.assign(new Error(out.error||'Запрос не выполнен'),{status:res.status});
  return out;
 }
-function accept(out){state=out.state;offset=out.now-Math.floor(Date.now()/1000);}
+function accept(out){
+ state=out.state;offset=out.now-Math.floor(Date.now()/1000);
+ if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
+}
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
 function media(id,locked=false){
  const el=node('span',locked?'◇':rarities[id[4]][1],'media');el.setAttribute('aria-hidden','true');
@@ -61,10 +66,12 @@ function album(){
 }
 function refresh(){
  if(!state)return;
- const left=5-state.used, blocked=busy||!!pending;
+ const left=5-state.used, spins=state.spins??0, blocked=busy||!!pending;
  $('coins').textContent=state.coins;$('dust').textContent=state.dust;
- $('free').textContent=`Бесплатно: ${left} из 5 · сброс в 00:00 UTC`;
- for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left),missing=cost-state.coins;
+ $('free').textContent=`Бесплатно: ${left} из 5 · сброс в 00:00 UTC${spins?` · Тестовые: ${spins}`:''}`;
+ if(testPanel)testPanel.hidden=!canGrantSpins;
+ for(const b of grants)b.disabled=blocked||!canGrantSpins;
+ for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left-spins),missing=cost-state.coins;
   b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Бесплатно'));b.disabled=blocked||missing>0;
  }
  const counts=Object.entries(state.owned);
@@ -124,7 +131,7 @@ async function sync(){
  if(!state||busy||syncing)return;
  syncing=true;
  try{const out=await api('state');if(!busy){accept(out);refresh();if(!$('album').hidden)album();}}
- catch(e){if(e.status===401){state=null;for(const b of [...buttons,$('break')])b.disabled=true;say(e.message);}}
+ catch(e){if(e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...grants,$('break')])b.disabled=true;say(e.message);}}
  finally{syncing=false;}
 }
 async function transact(kind,size){
@@ -136,7 +143,9 @@ async function transact(kind,size){
  say('Сохраняем результат…');
  try{
   const out=await api(pending.kind,{op:pending.op,size:pending.size});
-  if(pending.kind==='draw')await reveal(out);else say(`Получено пыли: ${out.gain}`);
+  if(pending.kind==='draw')await reveal(out);
+  else if(pending.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
+  else say(`Получено пыли: ${out.gain}`);
   accept(out);
   pending=null;remember();
  }catch(e){
@@ -148,6 +157,7 @@ async function transact(kind,size){
 function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
 $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
+for(const b of grants)b.onclick=()=>{if(canGrantSpins)transact('grant',Number(b.dataset.grant));};
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
 setInterval(()=>{if(!busy)refresh();if(state&&new Date(clock()*1000).toISOString().slice(0,10)!==state.day)sync();},5000);

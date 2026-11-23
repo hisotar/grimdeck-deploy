@@ -42,6 +42,9 @@ CATALOG = json.loads((ROOT/'cards.js').read_text().split('=',1)[1].strip().remov
 CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
 DAY = 86400
+PACK_SIZES = (1, 10, 50)
+GRANT_SIZES = (10, 50)
+MAX_TEST_SPINS = 500
 
 
 def schema(db):
@@ -63,7 +66,8 @@ def play(db, uid, kind, data, bonus, now):
         db.execute('BEGIN IMMEDIATE' if kind != 'state' else 'BEGIN')
     row = execute(db,'SELECT state FROM players WHERE uid=?',(uid,)).fetchone()
     day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
-    state = json.loads(row[0]) if row else dict(day=day, used=0, coins=bonus, dust=0, lastBreak=0, owned={})
+    state = json.loads(row[0]) if row else dict(day=day, used=0, spins=0, coins=bonus, dust=0, lastBreak=0, owned={})
+    state.setdefault('spins', 0)
     if state['day'] != day:
         state.update(day=day, used=0)
     if kind == 'state':
@@ -71,7 +75,8 @@ def play(db, uid, kind, data, bonus, now):
     op, size = data.get('op'), data.get('size', 0)
     if not isinstance(op,str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,64}',op):
         return 400, {'error':'Некорректный номер операции'}
-    if type(size) is not int or size not in ((1,10,50) if kind=='draw' else (0,)):
+    sizes = {'draw': PACK_SIZES, 'break': (0,), 'grant': GRANT_SIZES}
+    if type(size) is not int or size not in sizes.get(kind, ()):
         return 400, {'error':'Некорректный размер пакета'}
     old = execute(db,'SELECT kind,size,result FROM operations WHERE uid=? AND op=?',(uid,op)).fetchone()
     if old:
@@ -80,10 +85,12 @@ def play(db, uid, kind, data, bonus, now):
         return 200, {'state':state,'now':now,**json.loads(old[2])}
     owned = state['owned']
     if kind == 'draw':
-        free = min(size,5-state['used']); cost = size-free
+        daily = min(size,5-state['used'])
+        extra = min(size-daily,state['spins'])
+        cost = size-daily-extra
         if cost > state['coins']:
             return 409, {'error':f"Не хватает монет: {cost-state['coins']}"}
-        state['used'] += free; state['coins'] -= cost
+        state['used'] += daily; state['spins'] -= extra; state['coins'] -= cost
         cards = []
         for _ in range(size):
             roll = secrets.randbelow(100)
@@ -92,6 +99,11 @@ def play(db, uid, kind, data, bonus, now):
             cards.append({'id':cid,'new':qty==0});owned[cid]=qty+1
         featured = max(range(size),key=lambda i:(cards[i]['new'],'CRELM'.index(cards[i]['id'][4])))
         result = dict(cards=cards,featured=featured,newCount=sum(c['new'] for c in cards))
+    elif kind == 'grant':
+        if state['spins']+size > MAX_TEST_SPINS:
+            return 409, {'error':f'Лимит тестовых круток: {MAX_TEST_SPINS}'}
+        state['spins'] += size
+        result = dict(granted=size)
     else:
         if state['lastBreak'] and now < state['lastBreak']+DAY:
             return 409, {'error':'Разбор пока недоступен'}
@@ -129,7 +141,7 @@ class Play(Handler):
         self.response(404,{})
 
     def do_POST(self):
-        if self.path not in ('/api/session','/api/draw','/api/break'): return self.response(404,{})
+        if self.path not in ('/api/session','/api/draw','/api/break','/api/grant'): return self.response(404,{})
         if self.headers.get('Origin')!=self.server.origin: return self.response(403,{})
         try:
             n=int(self.headers.get('Content-Length','0'))
@@ -158,7 +170,11 @@ class Play(Handler):
                     return self.response(200,{'player':self.player_key(uid)},f'{name}={sid}; Path=/; HttpOnly; {flags}; Max-Age={ttl}')
                 if not row or (secure and (not row[0].startswith('tg:') or int(row[0][3:]) not in self.server.allowed)):
                     return self.response(401,{'error':'Открой игру заново, чтобы войти'})
+                # Only a current allowlisted Telegram session (or the loopback demo)
+                # reaches play(), so grants always affect that tester's own account.
                 status,out=play(db,row[0],kind,data,3 if secure else 120,now)
+                if kind=='state' and status==200:
+                    out['canGrantSpins']=True
                 self.response(status,out)
         except (KeyError, ValueError, TypeError, CookieError): self.response(401,{'error':'Не удалось войти'})
         except DB_ERRORS: self.response(503,{'error':'Сохранение временно недоступно'})
