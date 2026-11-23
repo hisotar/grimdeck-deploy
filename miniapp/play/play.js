@@ -1,6 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const rarities={C:['Обычная','♠',34],R:['Редкая','✧',27],E:['Эпическая','☾',21],L:['Легендарная','♜',16],M:['Мифическая','✦',2]};
+const rarityOrder='MLERC';
 const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
@@ -42,9 +43,11 @@ function paint(button,id,{fresh=false,album=false}={}){
 function tile(id,options){const b=node('button',undefined,'tile');b.type='button';paint(b,id,options);return b;}
 function album(){
  const q=$('search').value.trim().toLocaleLowerCase('ru'), rarity=$('rarity').value;
- const visible=catalog.filter(([id,name])=>(!rarity||id[4]===rarity)&&(!$('owned').checked||qty(id))&&`${name} ${id}`.toLocaleLowerCase('ru').includes(q));
+ const visible=catalog.filter(([id,name])=>qty(id)>0&&(!rarity||id[4]===rarity)&&`${name} ${id}`.toLocaleLowerCase('ru').includes(q)).sort(([a],[b])=>rarityOrder.indexOf(a[4])-rarityOrder.indexOf(b[4]));
  $('albumGrid').replaceChildren(...visible.map(([id])=>tile(id,{album:true})));
- if(!visible.length){const reset=node('button','Сбросить фильтры');reset.onclick=()=>{$('search').value='';$('rarity').value='';$('owned').checked=false;album();};$('albumGrid').append(node('p','Карты не найдены.'),reset);}
+ if(!visible.length&&!state)return;
+ if(!visible.length&&!Object.values(state.owned).some(n=>n>0)){ $('albumGrid').append(node('p','Коллекция пока пуста. Открой первую карту в колоде.'));return; }
+ if(!visible.length){const reset=node('button','Сбросить фильтры');reset.onclick=()=>{$('search').value='';$('rarity').value='';album();};$('albumGrid').append(node('p','Карты не найдены.'),reset);}
 }
 function refresh(){
  if(!state)return;
@@ -64,9 +67,21 @@ function refresh(){
  $('break').disabled=blocked||!extra||!!wait;
  $('retry').hidden=!pending||busy;
 }
-function route(){
+let activePane=null, transition=null, navigation=0;
+async function route(){
+ const version=++navigation;
+ transition?.cancel();
  const panes=['home','album','workshop'], id=panes.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+ const animate=activePane&&activePane!==id&&!motion.matches&&$(id).animate;
+ if(animate){
+  transition=$(activePane).animate([{opacity:1},{opacity:0}],{duration:85,fill:'forwards'});
+  try{await transition.finished;}catch{}
+  if(version!==navigation)return;
+  transition.cancel();
+ }
  for(const p of panes)$(p).hidden=p!==id;
+ activePane=id;
+ if(animate)transition=$(id).animate([{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:165,easing:'ease-out'});
  for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
  if(id==='home')tg?.BackButton?.hide();else tg?.BackButton?.show();
@@ -122,8 +137,8 @@ async function transact(kind,size){
 }
 function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
 $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
-for(const [r,[name]] of Object.entries(rarities))$('rarity').add(new Option(name,r));
-$('search').oninput=album;$('rarity').onchange=$('owned').onchange=album;
+for(const r of rarityOrder)$('rarity').add(new Option(rarities[r][0],r));
+$('search').oninput=album;$('rarity').onchange=album;
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
