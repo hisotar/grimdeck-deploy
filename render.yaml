@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: grimdeck-beta
+    runtime: python
+    plan: free
+    buildCommand: pip install -r miniapp/requirements.txt
+    startCommand: python miniapp/play_server.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: GRIM_MODE
+        value: telegram
+      - key: DATABASE_URL
+        sync: false
+      - key: GRIM_TEST_USERS
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
