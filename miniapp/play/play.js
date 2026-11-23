@@ -127,20 +127,25 @@ async function reveal(out){
  if(out.cards.length>1){$('packGrid').replaceChildren(...out.cards.flatMap(({id,new:fresh},i)=>i===out.featured?[]:[tile(id,{fresh})]));$('summary').textContent=`Новых карт: ${out.newCount} из ${out.cards.length}`;$('pack').hidden=false;}
  say(out.cards.length===1?`${entry.new?'Новая карта':'Повтор'}: ${cards.get(entry.id)[1]}`:`Открыто карт: ${out.cards.length}`);
 }
+// A background read must never overwrite a newer operation's state.
+let operationVersion=0;
 async function sync(){
  if(!state||busy||syncing)return;
+ const version=operationVersion;
  syncing=true;
- try{const out=await api('state');if(!busy){accept(out);refresh();if(!$('album').hidden)album();}}
- catch(e){if(e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...grants,$('break')])b.disabled=true;say(e.message);}}
+ try{const out=await api('state');if(version===operationVersion){accept(out);refresh();if(!$('album').hidden)album();}}
+ catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...grants,$('break')])b.disabled=true;say(e.message);}}
  finally{syncing=false;}
 }
 async function transact(kind,size){
- if(!state||busy||syncing)return;
+ if(!state||busy)return;
  if(pending&&kind)return;
  if(!pending){pending={kind,op:crypto.randomUUID(),size};remember();}
+ operationVersion++;
  busy=true;refresh();
  if(pending.kind==='draw'){resetTable();DrawSound.play();}
  say('Сохраняем результат…');
+ let conflict=false;
  try{
   const out=await api(pending.kind,{op:pending.op,size:pending.size});
   if(pending.kind==='draw')await reveal(out);
@@ -149,10 +154,10 @@ async function transact(kind,size){
   accept(out);
   pending=null;remember();
  }catch(e){
-  if(e.status===400||e.status===409){pending=null;remember();say(e.message);}
+  if(e.status===400||e.status===409){conflict=e.status===409;pending=null;remember();say(e.message);}
   else say(e.status===401?'Открой игру заново. Запрос сохранён.':'Ответ не получен. Повтори тот же запрос: двойного списания не будет.');
  }finally{busy=false;refresh();if(!$('album').hidden)album();}
- if(!pending)sync();
+ if(conflict)sync();
 }
 function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
 $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
