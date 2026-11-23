@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const rarities={C:['Обычная','♠',34],R:['Редкая','✧',27],E:['Эпическая','☾',21],L:['Легендарная','♜',16],M:['Мифическая','✦',2]};
-const rarityOrder='MLERC';
+const rarityGroups=[['M','Мифические'],['L','Легендарные'],['E','Эпические'],['R','Редкие'],['C','Обычные']];
 const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
@@ -42,12 +42,22 @@ function paint(button,id,{fresh=false,album=false}={}){
 }
 function tile(id,options){const b=node('button',undefined,'tile');b.type='button';paint(b,id,options);return b;}
 function album(){
- const q=$('search').value.trim().toLocaleLowerCase('ru'), rarity=$('rarity').value;
- const visible=catalog.filter(([id,name])=>qty(id)>0&&(!rarity||id[4]===rarity)&&`${name} ${id}`.toLocaleLowerCase('ru').includes(q)).sort(([a],[b])=>rarityOrder.indexOf(a[4])-rarityOrder.indexOf(b[4]));
- $('albumGrid').replaceChildren(...visible.map(([id])=>tile(id,{album:true})));
- if(!visible.length&&!state)return;
- if(!visible.length&&!Object.values(state.owned).some(n=>n>0)){ $('albumGrid').append(node('p','Коллекция пока пуста. Открой первую карту в колоде.'));return; }
- if(!visible.length){const reset=node('button','Сбросить фильтры');reset.onclick=()=>{$('search').value='';$('rarity').value='';album();};$('albumGrid').append(node('p','Карты не найдены.'),reset);}
+ if(!state)return;
+ const sections=rarityGroups.map(([r,name])=>{
+  const all=catalog.filter(([id])=>id[4]===r);
+  const owned=all.filter(([id])=>qty(id)>0);
+  const section=node('section',undefined,'album-category');
+  const header=node('h2',undefined,'album-category-title');
+  header.append(node('span',name),node('span',`${owned.length} / ${all.length}`,'album-category-count'));
+  section.append(header);
+  if(owned.length){
+   const grid=node('div',undefined,'grid');
+   grid.append(...owned.map(([id])=>tile(id,{album:true})));
+   section.append(grid);
+  }
+  return section;
+ });
+ $('albumGrid').replaceChildren(...sections);
 }
 function refresh(){
  if(!state)return;
@@ -137,8 +147,6 @@ async function transact(kind,size){
 }
 function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
 $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
-for(const r of rarityOrder)$('rarity').add(new Option(rarities[r][0],r));
-$('search').oninput=album;$('rarity').onchange=album;
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
