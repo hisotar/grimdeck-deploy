@@ -95,9 +95,9 @@
 .deck-tools-grid button{display:grid;justify-items:center;align-content:center;gap:5px;min-width:0;padding:8px;min-height:76px;background:linear-gradient(#382c20,#241e18);color:#dfc9a4;font:700 14px/1.15 Georgia,serif;overflow-wrap:anywhere;box-shadow:inset 0 0 0 2px #221a13,inset 0 0 0 3px #8b694148}
 .deck-tools-grid button span{font-size:22px;line-height:1;color:#d8af71}
 .deck-tool{text-align:center}
-.deck-back{display:inline-flex;align-items:center;min-height:44px;color:var(--gold);text-decoration:none}
+.deck-back{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:var(--gold);text-decoration:none}
 .deck-tool .deck-back{justify-content:center;gap:12px;min-height:58px;width:min(100%,264px);margin:8px 0 12px;padding:8px 20px;border:1px solid #96714c;border-radius:8px;background:linear-gradient(#3c2e20,#241d17);box-shadow:inset 0 0 0 3px #211912,0 4px 9px #100d0a88;color:#f0d4a5;font:700 20px/1.1 Georgia,serif}
-.deck-tool .deck-back span{font-size:30px;line-height:1}
+.deck-arrow{display:block;flex:none;width:20px;height:20px}.deck-tool .deck-arrow{width:30px;height:30px}
 .deck-tool .deck-back:active{filter:brightness(.8)}
 .spin-panel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0;padding:9px 11px;border:1px solid #6d553b;border-radius:8px;background:linear-gradient(145deg,#30271d,#211f18);box-shadow:inset 0 0 0 2px #191611}
 .spin-panel b,.spin-panel small{display:block}.spin-panel b{color:#ecd1a7}.spin-panel small{color:var(--muted);font-variant-numeric:tabular-nums}.spin-panel button{flex:none;padding-inline:10px}
@@ -124,7 +124,11 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .shuffle-stack i:nth-child(6){--x:1px;--z:15px;--angle:-10deg}
 .shuffle-scene[data-phase=scattered] .shuffle-stack i{opacity:0}
 .shuffle-scene[data-phase=aligned] .shuffle-stack i{transform:translate3d(calc(var(--z,0px) * -.26),calc(var(--z,0px) * -.28),var(--z,0px))}
-.shuffle-flash{position:absolute;inset:0;z-index:2;opacity:0;pointer-events:none;background:radial-gradient(ellipse 100px 113px at center,#fffdf2 52%,#ffe4a5 71%,transparent 100%),radial-gradient(ellipse 48% 50% at center,#ffd487,transparent),repeating-conic-gradient(from 12deg at center,transparent 0 35deg,#f6bd7566 39deg,transparent 43deg 58deg);mask-image:radial-gradient(ellipse at center,#000 41%,transparent 74%)}
+.shuffle-flash,.shuffle-wave,.shuffle-sparks{position:absolute;pointer-events:none;z-index:2}
+.shuffle-flash{inset:0;opacity:0;background:radial-gradient(ellipse 99px 104px at center,#fffcf0 68%,#ffca7b 83%,transparent 100%),radial-gradient(ellipse 46% 49% at center,#e5a45486,transparent 94%)}
+.shuffle-wave{inset:0;opacity:0;background:radial-gradient(ellipse 48% 18% at center,transparent 70%,#db955454 86%,#ffe1a6 91%,#b571433d 95%,transparent 100%);transform-origin:50% 50%}
+.shuffle-sparks{inset:0;z-index:3}
+.shuffle-sparks i{position:absolute;left:50%;top:50%;width:var(--w);height:2px;margin:-1px 0 0 calc(var(--w) / -2);border-radius:50%;background:#ffdfa0;box-shadow:0 0 7px #ffad56;opacity:0}
 .shuffle-button{width:min(100%,202px);min-height:46px;margin:0 auto 4px;border-color:#a97d52}
 .shuffle-info,.shuffle-result{margin:6px auto 2px;max-width:34ch;font-size:12px;color:var(--muted)}
 .shuffle-result{color:var(--green);font-weight:700}
@@ -135,4 +139,3 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .pack-new-slot .new-card-label{font-size:10px;letter-spacing:.03em}
 .notice-link{color:var(--gold)}
 .shuffle-ring{position:absolute;inset:27% 7%;border:1px solid #e5b47588;border-radius:50%;opacity:0;pointer-events:none;box-shadow:0 0 19px #e7a7485c,inset 0 0 19px #e7a7485c}
-.shuffle-flash::before{content:'';position:absolute;inset:13%;background:radial-gradient(circle at 15% 47%,#ffdf91 1px,transparent 3px),radial-gradient(circle at 81% 27%,#fff3cb 2px,transparent 4px),radial-gradient(circle at 77% 71%,#ffd081 2px,transparent 4px),radial-gradient(circle at 30% 78%,#ffdf91 1px,transparent 3px),radial-gradient(circle at 33% 19%,#fff3cb 1px,transparent 3px)}

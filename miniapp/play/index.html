@@ -17,22 +17,24 @@
 </details></section>
  <!-- tool pages -->
  <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden>
-  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Перетасовка</h1>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Перетасовка</h1>
   <div id="shuffleScene" class="shuffle-scene" aria-hidden="true">
    <div class="shuffle-stack"><i></i><i></i><i></i><i></i><i></i><i></i></div>
    <div id="shuffleRing" class="shuffle-ring"></div>
    <div id="shuffleAir" class="shuffle-air"></div>
    <div id="shuffleFlash" class="shuffle-flash"></div>
+   <div id="shuffleWave" class="shuffle-wave"></div>
+   <div id="shuffleSparks" class="shuffle-sparks"></div>
   </div>
   <button id="break" class="primary shuffle-button" type="button" disabled>Перетасовать</button>
   <p id="breakResult" class="shuffle-result" role="status" hidden></p>
   <p id="breakInfo" class="shuffle-info"></p>
  </section>
  <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
-  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Крафт</h1></section>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Крафт</h1></section>
  <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden>
-  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Задания</h1></section>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Задания</h1></section>
  <section id="tool-rank" class="deck-tool" aria-label="Топ" hidden>
-  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Топ</h1></section>
-<section id="album" hidden><p class="edition">АЛЬБОМ КОНТИНЕНТА</p><h1>Коллекция</h1><p id="count"></p><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home">← Колода</a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="pack-face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Топ</h1></section>
+<section id="album" hidden><p class="edition">АЛЬБОМ КОНТИНЕНТА</p><h1>Коллекция</h1><p id="count"></p><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="pack-face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
 <nav aria-label="Разделы"><a href="#home">Колода</a><a href="#album">Коллекция</a></nav></main><dialog id="detail"><div id="detailBody"></div><form method="dialog"><button>Закрыть</button></form></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog></body></html>
