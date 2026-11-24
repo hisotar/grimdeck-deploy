@@ -171,4 +171,34 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .pack-new-slot{width:82%;overflow:hidden}
 .pack-new-slot .new-card-label{font-size:10px;letter-spacing:.03em}
 .notice-link{color:var(--gold)}
+/* Workshop: all moving layers are clipped to the timber frame. */
+.craft-bench{
+ position:relative;isolation:isolate;overflow:hidden;height:clamp(202px,59vw,260px);border:5px solid #392418;border-radius:10px;
+ background:radial-gradient(ellipse at 48% 37%,#de995538,transparent 70%),repeating-linear-gradient(2deg,transparent 0 3px,#24130c30 4px 5px,transparent 6px 11px),repeating-linear-gradient(0deg,#54321f 0 2px,#281a14 3px 5px,#6e452c 6px 9px,#4e301f 53px,#362219 56px);
+ box-shadow:inset 0 0 24px 4px #21150f,0 5px 0 #100e0c,0 10px 18px #1119;
+}
+.bench-nail{position:absolute;top:10px;width:10px;height:10px;border-radius:50%;background:linear-gradient(25deg,#422e1e 35%,#a28e76 47%,#716350 61%);box-shadow:0 1px 3px #200}
+.bench-nail.left{left:10px}.bench-nail.right{right:10px}
+.bench-anvil{position:absolute;inset:50% auto auto 50%;width:clamp(110px,43%,168px);height:78px;transform:translate(-50%,-45%);border:2px solid #6f6254;border-radius:21% 21% 19% 19%;background:linear-gradient(147deg,#4b433b,#312b27 48%,#241e1a);box-shadow:inset 0 0 0 4px #3b322a,0 7px 0 #231813,0 9px 15px #23140c;}
+.craft-hammer,.craft-bag,.craft-particles,.craft-item{position:absolute;top:50%;left:50%}
+.craft-hammer{z-index:2;width:60px;height:104px;margin:-52px 0 0 -30px;transform:translate(66px,15px) rotate(-49deg);filter:drop-shadow(3px 5px 3px #22160d)}
+.craft-bag{z-index:2;width:55px;height:51px;margin:-82px 0 0 clamp(-111px,-29vw,-75px);opacity:0;filter:drop-shadow(2px 3px 3px #22160d)}
+.craft-particles{z-index:1}.craft-particles i{position:absolute;display:block;opacity:0}
+.bench-dust{width:7px;height:6px;background:#e8bc76;border:1px solid #ffdc93;border-radius:36%;box-shadow:0 0 4px #ffd67577}
+.bench-scrap{width:13px;height:16px;clip-path:polygon(0 0,100% 14%,78% 41%,100% 96%,12% 100%,25% 76%,0 63%);background:repeating-linear-gradient(118deg,var(--tone,#d6ba88) 0 3px,#655344 4px 5px);border:1px solid #4b3930}
+.bench-spark{width:13px;height:3px;border-radius:50%;background:#ffc66d;box-shadow:0 0 8px #ff923f;transform-origin:left center}
+.craft-item{z-index:3;display:grid;justify-items:center;gap:4px;min-width:112px;padding:9px 10px;transform:translate(-50%,-53%);border:1px solid #94734d;border-radius:9px;background:#211a15f5;color:#ffe5b0;box-shadow:0 0 28px #ffc97163;animation:craft-item-in .26s ease-out}
+@keyframes craft-item-in{from{opacity:0;transform:translate(-50%,-49%) scale(.86)}}
+@media(prefers-reduced-motion:reduce){.craft-item{animation:none}}
+.craft-icon{display:block;width:32px;height:32px;padding:3px;color:#f1c580;background:#3b2c20;border:1px solid #865d3a;border-radius:7px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
+.craft-icon[data-kind=draw]{color:#f2d693}.craft-icon[data-kind=shuffle]{color:#9fe0cb}.craft-icon[data-kind=arena]{color:#efa287}
+.craft-result{min-height:1.45em;margin:12px 0 10px;color:#ead4ac}
+.craft-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0 0 8px}
+.craft-switch [aria-pressed=true]{background:#523721;color:#ffe7ba;border-color:#c5985c}
+.craft-list{text-align:left;display:grid;gap:5px}
+.craft-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;border:1px solid #695139;border-radius:7px;background:linear-gradient(150deg,#33271d,#221d18);overflow-wrap:anywhere}
+.craft-row small{display:block;color:var(--muted);line-height:1.25;margin-top:2px}.craft-row button{padding-inline:8px;color:#f1c994;font-size:12px;max-width:100%}
+.craft-inventory{margin:17px 0 4px;padding-top:6px;border-top:1px solid #7a5e41}
+.boost-status{padding:8px;border:1px solid #8f734d;border-radius:6px;background:#36271a;color:#f4d493;font-size:12px;font-weight:700}
+@media(max-width:340px){.craft-row{gap:5px;padding:6px}.craft-row .craft-icon{width:26px;height:26px}.craft-row button{padding-inline:5px}}
 .shuffle-ring{position:absolute;inset:27% 7%;border:1px solid #e5b47588;border-radius:50%;opacity:0;pointer-events:none;box-shadow:0 0 19px #e7a7485c,inset 0 0 19px #e7a7485c}

@@ -13,7 +13,7 @@ const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
-let shuffleMastery;
+let shuffleMastery, craftRecipes;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -29,6 +29,7 @@ function accept(out){
  state=out.state;offset=out.now-Math.floor(Date.now()/1000);
  shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
  if(out.shuffleMastery)shuffleMastery=out.shuffleMastery;
+ if(out.craftRecipes)craftRecipes=out.craftRecipes;
  if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
 }
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
@@ -98,6 +99,60 @@ const lootRows=loot.map(([kind,label,d])=>{
  const item=node('li'), chance=node('b','—');item.dataset.kind=kind;item.append(icon,node('span',label),chance);$('shuffleLoot').append(item);
  return [kind,chance];
 });
+const craftIcons={
+ spins:'M5 6h14v4a2 2 0 0 0 0 4v4H5v-4a2 2 0 0 0 0-4Zm7 2 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z',
+ draw:'M12 2 22 12 12 22 2 12Zm0 4 1.5 4.5L18 12l-4.5 1.5L12 18l-1.5-4.5L6 12l4.5-1.5Z',
+ shuffle:'M5 10a7 7 0 0 1 12-4l3 3m0-5v5h-5M19 14a7 7 0 0 1-12 4l-3-3m0 5v-5h5m3-6v6m-3-3h6',
+ arena:'M12 22c-6-3-9-8-9-15l9-4 9 4c0 7-3 12-9 15Zm-4-7 8-8v5m0-5h-5m-4 6 4 4'
+};
+const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','+1 к мастерству · 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене']};
+const materialNames={C:'обычные',R:'редкие',E:'эпические',L:'легендарные',M:'мифические'};
+function craftIcon(kind){
+ const icon=document.createElementNS(svgNS,'svg'), path=document.createElementNS(svgNS,'path');
+ icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('class','craft-icon');icon.setAttribute('aria-hidden','true');icon.dataset.kind=kind;
+ path.setAttribute('d',craftIcons[kind]);icon.append(path);return icon;
+}
+function spinLabel(n){return `${n} ${n===1?'крутка':n<5?'крутки':'круток'}`;}
+const craftTitle=recipe=>recipe.boost?boostInfo[recipe.boost][0]:`+${spinLabel(recipe.spins)}`;
+const recipeRows=[], inventoryRows=[];
+function buildCraft(){
+ for(const [key,recipe] of Object.entries(craftRecipes)){
+  const id=Number(key), {material,cost,boost}=recipe, row=node('div',undefined,'craft-row');
+  const copy=node('div'), title=node('strong',craftTitle(recipe)), amount=node('small');
+  const costText=material==='dust'?`${cost} пыли`:`${cost} повторок · ${materialNames[material]}`;
+  copy.append(title,node('small',costText));if(boost)copy.append(node('small',boostInfo[boost][1]));copy.append(amount);
+  const button=node('button','Создать');button.type='button';button.setAttribute('aria-label',`Создать: ${title.textContent} за ${costText}`);
+  button.onclick=()=>transact('craft',id);row.append(craftIcon(boost||'spins'),copy,button);
+  $(boost?'craftBoostList':'craftSpinList').append(row);recipeRows.push({recipe,amount,button});
+  if(boost){
+   const item=node('div',undefined,'craft-row'), info=node('div'), status=node('small');
+   const activate=node('button','Активировать');activate.type='button';activate.setAttribute('aria-label',`Активировать: ${boostInfo[boost][0]}`);activate.onclick=()=>transact('activate-boost',id);
+   info.append(node('strong',boostInfo[boost][0]),status);item.append(craftIcon(boost),info,activate);$('craftInventory').append(item);
+   inventoryRows.push({boost,status,button:activate});
+  }
+ }
+}
+function refreshCraft(blocked){
+ if(craftRecipes&&!recipeRows.length)buildCraft();
+ const stock={dust:state.dust};
+ for(const [id,n] of Object.entries(state.owned))if(cards.has(id))stock[id[4]]=(stock[id[4]]||0)+Math.max(0,n-1);
+ const active=state.activeBoosts||{}, inventory=state.boostInventory||{};
+ for(const {recipe,amount,button} of recipeRows){const have=stock[recipe.material]||0;amount.textContent=`В наличии: ${have}`;button.disabled=blocked||have<recipe.cost;}
+ for(const {boost,status,button} of inventoryRows){
+  const n=inventory[boost]||0, left=active[boost]||0;
+  status.textContent=`В запасе: ${n}${boost==='arena'?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`;
+  button.disabled=blocked||!n||!!left||boost==='arena';
+ }
+ for(const [id,kind,text] of [['drawBoost','draw',`×1,5 к шансу легендарных и мифических · 24% и 3%`],['shuffleBoost','shuffle','+1 к мастерству перетасовки']]){
+  const el=$(id), left=active[kind]||0;
+  el.hidden=!left;if(left)el.textContent=`${text} · Осталось: ${left}`;
+ }
+ const chances=$('drawChances');chances.textContent=`Обычная ${active.draw?25:34}% · редкая 27% · эпическая 21% · легендарная ${active.draw?24:16}% · мифическая ${active.draw?3:2}%. Внутри редкости шансы карт равны.`;
+}
+for(const [id,isBoost] of [['craftSpinTab',false],['craftBoostTab',true]])$(id).onclick=()=>{
+ $('craftSpinTab').setAttribute('aria-pressed',String(!isBoost));$('craftBoostTab').setAttribute('aria-pressed',String(isBoost));
+ $('craftSpinList').hidden=isBoost;$('craftBoostList').hidden=!isBoost;
+};
 function refreshShuffle(blocked){
  const now=clock(), wait=Math.ceil(Math.max(0,shuffleReadyAt-now)/60);
  $('breakInfo').textContent=`Гарантированно: 1–5 пыли. ${wait?`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`:'Повторы не нужны.'}`;
@@ -105,8 +160,9 @@ function refreshShuffle(blocked){
  if(!shuffleMastery)return;
  const expired=now>=shuffleMastery.resetsAt, count=expired?0:shuffleMastery.count, level=expired?1:shuffleMastery.level;
  [...$('masterySteps').children].forEach((step,i)=>{if(i+1===level)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');});
- $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: ×${level} к шансам · Сброс в 00:00 UTC`;
- for(const [kind,chance] of lootRows)chance.textContent=`${percent.format(shuffleMastery.weights[kind]*level/100)}%`;
+ const boosted=(state.activeBoosts?.shuffle||0)>0, effective=level+Number(boosted);
+ $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: ×${effective} к шансам${boosted?` (временный уровень ${roman(effective)})`:''} · Сброс в 00:00 UTC`;
+ for(const [kind,chance] of lootRows)chance.textContent=`${percent.format(shuffleMastery.weights[kind]*effective/100)}%`;
 }
 let shuffleRevealTimer=0;
 function hideShuffleReveal(){
@@ -163,7 +219,7 @@ function refresh(){
  $('clearCollection').disabled=blocked||!canGrantSpins||!counts.length;
  $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
  $('count').textContent=`Собрано ${counts.length} из ${catalog.length} · Копий: ${counts.reduce((n,[,k])=>n+k,0)}`;
- refreshShuffle(blocked);
+ refreshShuffle(blocked);refreshCraft(blocked);
  $('retry').hidden=!pending||busy;
 }
 const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack'];
@@ -331,6 +387,55 @@ async function shuffleDeck(){
  }
 }
 
+async function craftAtBench(recipe){
+ const title=craftTitle(recipe), onBench=()=>targetPane()==='tool-craft'&&!$('tool-craft').hidden;
+ const table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), air=$('craftParticles'), item=$('craftItem');
+ $('craftResult').textContent=`Готово: ${title}`;
+ const showItem=()=>{item.replaceChildren(craftIcon(recipe.boost||'spins'),node('b',title));item.hidden=false;};
+ if(!onBench()){showItem();say(`Создано: ${title}`);return;}
+ say('');item.hidden=true;
+ if(motion.matches||!table.animate){showItem();return;}
+ const jobs=[], epoch=document.timeline.currentTime, duration=2050, strikes=[850,1250,1650];
+ const animate=(el,frames,options)=>{
+  const a=el.animate(frames,options);jobs.push(a);if(epoch!=null)a.startTime=epoch;a.finished.catch(()=>{});return a;
+ };
+ stopScene=()=>jobs.forEach(a=>a.cancel());
+ $('craftResult').textContent='Работаем на верстаке…';
+ try{
+  const dust=recipe.material==='dust';
+  if(dust)animate(bag,[{opacity:0,transform:'translate(-32px,-24px) rotate(-25deg)'},{offset:.27,opacity:1,transform:'translate(0,0) rotate(0)'},{offset:.48,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{offset:.76,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{opacity:0,transform:'translate(-22px,-18px) rotate(74deg)'}],{duration:740,fill:'both'});
+  const at=(ms,frame)=>({...frame,offset:ms/duration});
+  const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(43px,7px) rotate(-96deg)';
+  const motionFrames=[at(0,{transform:rest})];
+  for(const ms of strikes)motionFrames.push(at(ms-180,{transform:raised,easing:'cubic-bezier(.72,0,.9,.42)'}),at(ms,{transform:hit,easing:'ease-out'}),at(ms+95,{transform:raised}));
+  motionFrames.push(at(duration,{transform:rest}));
+  const finish=animate(hammer,motionFrames,{duration,fill:'both'});
+  const spread=Math.min(102,table.clientWidth*.31);
+  for(let i=0;i<(dust?26:14);i++){
+   const bit=node('i',undefined,dust?'bench-dust':'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
+   const theta=i*2.4, x=Math.cos(theta)*spread*(.36+(i%8)*.09), y=Math.sin(theta)*(12+i%6*4)+13;
+   const pose=(x,y,turn,scale=1)=>`translate(${x}px,${y}px) rotate(${turn}deg) scale(${scale})`;
+   const start=(dust?195:90)+i*10;
+   const frames=[at(0,{opacity:0}),at(start,{opacity:0,transform:pose(dust?-spread*.68:0,-73,i*33)}),at(start+45,{opacity:1}),at(start+260,{opacity:1,transform:pose(x,y,i*72)})];
+   for(const [idx,ms] of strikes.entries()){
+    const f=1-idx*.34, next=f-.34;
+    frames.push(at(ms,{transform:pose(x*f,y*f,i*72),opacity:1}),at(ms+55,{transform:pose(x*(f+next)/2,y*f-6,i*72+19),opacity:1}),at(ms+150,{transform:pose(x*next,y*next,i*72,idx===2?.2:1),opacity:idx===2?0:1}));
+   }
+   frames.push(at(duration,{opacity:0}));animate(bit,frames,{duration,fill:'both'});
+  }
+  for(const [idx,ms] of strikes.entries())for(let i=0;i<10;i++){
+   const spark=node('i',undefined,'bench-spark');air.append(spark);
+   const theta=(i+.4)*Math.PI/10, x=Math.cos(theta)*(44+i*4), y=-Math.sin(theta)*(22+i*3);
+   animate(spark,[{transform:'translate(0,0) scale(.6)',opacity:0},{offset:.15,opacity:1},{transform:`translate(${x}px,${y}px) rotate(${i*21}deg) scale(.24)`,opacity:0}],{duration:220,delay:ms+idx*3,fill:'both',easing:'ease-out'});
+  }
+  await finish.finished;
+ }catch{}finally{
+  jobs.forEach(a=>a.cancel());air.replaceChildren();stopScene=null;
+  showItem();$('craftResult').textContent=`Готово: ${title}`;
+  if(!onBench())say(`Создано: ${title}`);
+ }
+}
+
 // A background read must never overwrite a newer operation's state.
 let operationVersion=0;
 async function sync(){
@@ -357,6 +462,8 @@ async function transact(kind,size){
   accept(out);
   pending=null;remember();
   if(op.kind==='draw')await reveal(out);
+  else if(op.kind==='craft')await craftAtBench(craftRecipes[out.crafted]);
+  else if(op.kind==='activate-boost')say(`Активировано: ${boostInfo[out.activated][0]}`);
   else if(op.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
   else if(op.kind==='clear-collection'){
    resetTable(table(''));resetTable(table('pack-'));

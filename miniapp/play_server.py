@@ -51,7 +51,23 @@ PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
 TEST_ACTIONS = {'grant': GRANT_SIZES, 'clear-collection': (0,), 'reset-shuffle': (0,)}
-ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), **TEST_ACTIONS}
+# Recipe IDs are stable: the operation journal also uses them on retries.
+CRAFT_RECIPES = {
+    1: dict(material='dust', cost=10, spins=1),
+    2: dict(material='C', cost=10, spins=2),
+    3: dict(material='R', cost=10, spins=3),
+    4: dict(material='E', cost=10, spins=5),
+    5: dict(material='L', cost=5, spins=5),
+    6: dict(material='M', cost=1, spins=10),
+    7: dict(material='dust', cost=100, boost='draw'),
+    8: dict(material='dust', cost=150, boost='shuffle'),
+    9: dict(material='dust', cost=200, boost='arena'),
+}
+BOOST_USES = {7: 10, 8: 4}
+DRAW_THRESHOLDS = (34, 61, 82, 98, 100)
+BOOSTED_DRAW_THRESHOLDS = (25, 52, 73, 97, 100)
+ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), 'craft': tuple(CRAFT_RECIPES),
+                'activate-boost': tuple(BOOST_USES), **TEST_ACTIONS}
 
 
 def schema(db):
@@ -92,10 +108,22 @@ def play(db, uid, kind, data, bonus, now):
     utc_day = now // DAY
     shuffles = state.get('shuffleCount', 0) if state.get('shuffleDay') == utc_day else 0
     state.setdefault('rewardSpins', 0)
+    inventory = state.setdefault('boostInventory', {})
+    active = state.setdefault('activeBoosts', {})
+
     def reply():
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
-                                        weights=SHUFFLE_BONUSES))
+                                        weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES)
+
+    def spend_boost(boost, units):
+        left = active.get(boost, 0)
+        used = min(left, units)
+        if used == left:
+            active.pop(boost, None)
+        else:
+            active[boost] = left - used
+        return used
 
     if kind == 'state':
         return 200, reply()
@@ -121,13 +149,50 @@ def play(db, uid, kind, data, bonus, now):
             state['freeNextAt'] = now + FREE_INTERVAL
         state['freeSpins'] -= free; state['rewardSpins'] -= reward; state['spins'] -= extra; state['coins'] -= cost
         cards = []
-        for _ in range(size):
+        boosted = spend_boost('draw', size)
+        for i in range(size):
             roll = secrets.randbelow(100)
-            rarity = next(r for r, threshold in zip('CRELM',(34,61,82,98,100)) if roll<threshold)
+            thresholds = BOOSTED_DRAW_THRESHOLDS if i < boosted else DRAW_THRESHOLDS
+            rarity = next(r for r, threshold in zip('CRELM', thresholds) if roll < threshold)
             cid = secrets.choice(POOLS[rarity]); qty = owned.get(cid,0)
             cards.append({'id':cid,'new':qty==0});owned[cid]=qty+1
         featured = max(range(size),key=lambda i:(cards[i]['new'],'CRELM'.index(cards[i]['id'][4])))
         result = dict(cards=cards,featured=featured,newCount=sum(c['new'] for c in cards))
+    elif kind == 'craft':
+        recipe = CRAFT_RECIPES[size]
+        material, cost = recipe['material'], recipe['cost']
+        if material == 'dust':
+            if state['dust'] < cost:
+                return 409, {'error': 'Не хватает пыли'}
+            state['dust'] -= cost
+        else:
+            # Spend the largest stacks first, using catalog IDs to break ties.
+            copies = sorted(((cid, qty - 1) for cid, qty in owned.items()
+                             if cid in CARDS and cid[4] == material and qty > 1),
+                            key=lambda item: (-item[1], item[0]))
+            if sum(qty for _, qty in copies) < cost:
+                return 409, {'error': 'Не хватает повторок этой редкости'}
+            for cid, qty in copies:
+                take = min(qty, cost)
+                owned[cid] -= take
+                cost -= take
+                if not cost:
+                    break
+        if 'spins' in recipe:
+            state['rewardSpins'] += recipe['spins']
+        else:
+            boost = recipe['boost']
+            inventory[boost] = inventory.get(boost, 0) + 1
+        result = dict(crafted=size)
+    elif kind == 'activate-boost':
+        boost = CRAFT_RECIPES[size]['boost']
+        if active.get(boost, 0):
+            return 409, {'error': 'Такой усилитель уже активен'}
+        if not inventory.get(boost, 0):
+            return 409, {'error': 'Усилителя нет в инвентаре'}
+        inventory[boost] -= 1
+        active[boost] = BOOST_USES[size]
+        result = dict(activated=boost)
     elif kind == 'grant':
         if state['spins']+size > MAX_TEST_SPINS:
             return 409, {'error':f'Лимит тестовых круток: {MAX_TEST_SPINS}'}
@@ -142,7 +207,7 @@ def play(db, uid, kind, data, bonus, now):
     else:
         if state['lastBreak'] and now < state['lastBreak'] + SHUFFLE_COOLDOWN:
             return 409, {'error':'Перетасовка пока недоступна'}
-        level = min(4, shuffles + 1)
+        level = min(4, shuffles + 1) + spend_boost('shuffle', 1)
         base = 1 + secrets.randbelow(5)
         roll = secrets.randbelow(10000)
         bonus_kind = None

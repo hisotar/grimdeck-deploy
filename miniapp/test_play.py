@@ -192,6 +192,71 @@ class FullGame(unittest.TestCase):
                 server.shutdown()
                 worker.join()
 
+    def seed(self, **fields):
+        state = {**self.run_play('state')[1]['state'], **fields}
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO players VALUES (?,?)', ('A', json.dumps(state)))
+
+    def test_craft_recipes_spend_materials_and_preserve_last_copies(self):
+        owned = {'WIT_C01': 7, 'WIT_C02': 5, 'WIT_C03': 1, 'WIT_R01': 11,
+                 'WIT_E01': 11, 'WIT_L01': 6, 'WIT_M01': 2}
+        self.seed(dust=460, owned=owned)
+        for recipe, expected_spins in enumerate((1, 3, 6, 11, 16, 26, 26, 26, 26), 1):
+            status, out = self.run_play('craft', recipe, recipe)
+            self.assertEqual((status, out['crafted'], out['state']['rewardSpins']), (200, recipe, expected_spins))
+            self.assertEqual(self.run_play('craft', recipe, recipe), (status, out))
+        state = out['state']
+        self.assertEqual(state['owned'], dict.fromkeys(owned, 1))
+        self.assertEqual(state['dust'], 0)
+        self.assertEqual(state['boostInventory'], {'draw': 1, 'shuffle': 1, 'arena': 1})
+        self.assertEqual(self.run_play('craft', 1, 2)[0], 409)
+        for recipe in range(1, 10):
+            self.assertEqual(self.run_play('craft', 10+recipe, recipe)[0], 409)
+        self.assertEqual(self.run_play('activate-boost', 20, 9)[0], 400)
+        self.assertEqual(self.run_play('state')[1]['state'], state)
+
+    def test_draw_boost_consumes_only_covered_cards_and_respects_retries(self):
+        self.seed(boostInventory={'draw': 2}, coins=60)
+        status, activated = self.run_play('activate-boost', 1, 7)
+        self.assertEqual((status, activated['state']['activeBoosts']), (200, {'draw': 10}))
+        self.assertEqual(self.run_play('activate-boost', 1, 7), (status, activated))
+        self.assertEqual(self.run_play('activate-boost', 2, 7)[0], 409)
+        self.assertEqual(self.run_play('draw', 2, 50, uid='B')[0], 409)
+        with patch.object(game.secrets, 'randbelow', side_effect=[73, 97, 25, 52, 24]+[97]*46):
+            _, first = self.run_play('draw', 3, 1)
+            self.assertEqual(first['state']['activeBoosts'], {'draw': 9})
+            _, pack = self.run_play('draw', 4, 50)
+        self.assertEqual(first['cards'][0]['id'][4], 'L')
+        self.assertEqual([c['id'][4] for c in pack['cards'][:9]], list('MRECM'+'MMMM'))
+        self.assertEqual({c['id'][4] for c in pack['cards'][9:]}, {'L'})
+        self.assertEqual(pack['state']['activeBoosts'], {})
+        self.assertEqual(pack['state']['boostInventory'], {'draw': 1})
+        self.assertEqual(self.run_play('draw', 4, 50), (200, pack))
+        self.assertEqual(self.run_play('activate-boost', 5, 7)[0], 200)
+        self.assertEqual(self.run_play('draw', 6, 50)[0], 409)
+        self.assertEqual(self.run_play('state')[1]['state']['activeBoosts'], {'draw': 10})
+
+    def test_shuffle_boost_reaches_five_and_expires_after_four_successes(self):
+        self.seed(boostInventory={'shuffle': 1}, shuffleDay=1, shuffleCount=4)
+        self.assertEqual(self.run_play('activate-boost', 1, 8)[0], 200)
+        for i, level in enumerate((5, 5, 5, 5, 4)):
+            now = 100000+i*game.SHUFFLE_COOLDOWN
+            with patch.object(game.secrets, 'randbelow', side_effect=[0, 1855*level-1]):
+                status, out = self.run_play('break', i+2, now=now)
+            self.assertEqual((status, out['masteryUsed'], out['bonus']), (200, level, 'mythic'))
+            self.assertEqual(out['state']['activeBoosts'].get('shuffle', 0), max(0, 3-i))
+            self.assertEqual(out['shuffleMastery']['level'], 4)
+            self.assertEqual(self.run_play('break', i+2, now=now), (status, out))
+            self.assertEqual(self.run_play('break', 20+i, now=now+1)[0], 409)
+
+    def test_parallel_craft_does_not_double_spend(self):
+        self.seed(dust=10)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda n: self.run_play('craft', n, 1)[0], (1, 2)))
+        self.assertEqual(sorted(results), [200, 409])
+        state = self.run_play('state')[1]['state']
+        self.assertEqual((state['dust'], state['rewardSpins']), (0, 1))
+
     def test_parallel_spending(self):
         with ThreadPoolExecutor(max_workers=2) as pool:
             results=list(pool.map(lambda n:self.run_play('draw',n,10,coins=5)[0], (1,2)))
