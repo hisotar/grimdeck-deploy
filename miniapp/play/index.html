@@ -1,4 +1,8 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header><b>✦ GRIMDECK</b><span><span id="coins">—</span> ◉ · <span id="dust">—</span> ◇</span></header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home"><p class="edition">КОЛЛЕКЦИЯ 01 · КОНТИНЕНТ</p><h1>Тропа ведьмака</h1><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
+<div class="spin-panel" aria-label="Бесплатные крутки и звук">
+ <div><b id="free">Бесплатно: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small></div>
+ <button id="sound" type="button">Звук</button>
+</div>
 <section class="deck-tools" aria-label="Разделы колоды">
  <div class="deck-tools-grid">
   <button type="button" data-tool="shuffle" aria-controls="tool-shuffle"><span aria-hidden="true">⤨</span>Перетасовка</button>
@@ -7,10 +11,13 @@
   <button type="button" data-tool="rank" aria-controls="tool-rank"><span aria-hidden="true">♜</span>Топ</button>
  </div>
 </section>
-<div class="meta"><span id="free">Бесплатные попытки: —</span><button id="sound" type="button">Звук</button></div><details><summary>Правила и шансы</summary><p>Первые пять карт за сутки бесплатны, дальше — одна монета за карту. Пакет открывается целиком.</p><p>Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details><details id="testPanel" hidden><summary>Панель тестировщика</summary><p>Начислить бесплатные крутки себе. Сначала расходуются ежедневные попытки, затем тестовые.</p><div class="actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button></div></details></section>
+<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Сначала расходуются бесплатные крутки, затем тестовые, затем монеты. Пакет открывается целиком.</p><p>Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
+<details id="testPanel" hidden><summary>Панель тестировщика</summary><p id="testSpins">Тестовые крутки: —</p>
+ <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
+</details></section>
  <!-- tool pages -->
  <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden>
-  <a class="deck-back" href="#home">← Колода</a><h1>Перетасовка</h1>
+  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Перетасовка</h1>
   <div id="shuffleScene" class="shuffle-scene" aria-hidden="true">
    <div class="shuffle-stack"><i></i><i></i><i></i><i></i><i></i><i></i></div>
    <div id="shuffleRing" class="shuffle-ring"></div>
@@ -22,10 +29,10 @@
   <p id="breakInfo" class="shuffle-info"></p>
  </section>
  <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
-  <a class="deck-back" href="#home">← Колода</a><h1>Крафт</h1></section>
+  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Крафт</h1></section>
  <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden>
-  <a class="deck-back" href="#home">← Колода</a><h1>Задания</h1></section>
+  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Задания</h1></section>
  <section id="tool-rank" class="deck-tool" aria-label="Топ" hidden>
-  <a class="deck-back" href="#home">← Колода</a><h1>Топ</h1></section>
+  <a class="deck-back" href="#home"><span aria-hidden="true">←</span> Колода</a><h1>Топ</h1></section>
 <section id="album" hidden><p class="edition">АЛЬБОМ КОНТИНЕНТА</p><h1>Коллекция</h1><p id="count"></p><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home">← Колода</a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="pack-face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
-<nav aria-label="Разделы"><a href="#home">Колода</a><a href="#album">Коллекция</a></nav></main><dialog id="detail"><div id="detailBody"></div><form method="dialog"><button>Закрыть</button></form></dialog></body></html>
+<nav aria-label="Разделы"><a href="#home">Колода</a><a href="#album">Коллекция</a></nav></main><dialog id="detail"><div id="detailBody"></div><form method="dialog"><button>Закрыть</button></form></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog></body></html>

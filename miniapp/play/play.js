@@ -6,12 +6,12 @@ const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
 const grants=[...document.querySelectorAll('[data-grant]')];
-const testPanel=$('testPanel');
+const testPanel=$('testPanel'), clearConfirm=$('clearConfirm');
+const testerButtons=[...grants,$('clearCollection'),$('resetShuffle')];
 const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
-const day=86400;
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
@@ -80,15 +80,20 @@ function album(){
 }
 function refresh(){
  if(!state)return;
- const left=5-state.used, spins=state.spins??0, blocked=busy||!!pending;
+ const left=state.freeSpins, spins=state.spins??0, blocked=busy||!!pending;
  $('coins').textContent=state.coins;$('dust').textContent=state.dust;
- $('free').textContent=`Бесплатно: ${left} из 5 · сброс в 00:00 UTC${spins?` · Тестовые: ${spins}`:''}`;
+ const freeMinutes=Math.ceil(Math.max(0,state.freeNextAt-clock())/60);
+ $('free').textContent=`Бесплатно: ${left} из 5`;
+ $('freeTimer').textContent=left===5?'Запас полный · +1 каждые 3 часа':freeMinutes?`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`:'Обновляем крутки…';
+ $('testSpins').textContent=`Тестовые крутки: ${spins}`;
  if(testPanel)testPanel.hidden=!canGrantSpins;
  for(const b of grants)b.disabled=blocked||!canGrantSpins;
  for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left-spins),missing=cost-state.coins;
   b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Бесплатно'));b.disabled=blocked||missing>0;
  }
  const counts=Object.entries(state.owned);
+ $('clearCollection').disabled=blocked||!canGrantSpins||!counts.length;
+ $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
  $('count').textContent=`Собрано ${counts.length} из ${catalog.length} · Копий: ${counts.reduce((n,[,k])=>n+k,0)}`;
  let extra=0,gain=0;
  for(const [id,n] of counts){extra+=n-1;gain+=(n-1)*cards.get(id)[6];}
@@ -128,7 +133,7 @@ async function route(){
  for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
- if(id==='home'&&!$('detail').open)tg?.BackButton?.hide();else tg?.BackButton?.show();
+ if(id==='home'&&!$('detail').open&&!clearConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo(0,0);
 }
 function table(prefix){
@@ -257,7 +262,7 @@ async function sync(){
  const version=operationVersion;
  syncing=true;
  try{const out=await api('state');if(version===operationVersion){accept(out);refresh();if(!$('album').hidden)album();}}
- catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...grants,$('break')])b.disabled=true;say(e.message);}}
+ catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...testerButtons,$('break')])b.disabled=true;say(e.message);}}
  finally{syncing=false;}
 }
 async function transact(kind,size){
@@ -277,6 +282,15 @@ async function transact(kind,size){
   pending=null;remember();
   if(op.kind==='draw')await reveal(out);
   else if(op.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
+  else if(op.kind==='clear-collection'){
+   resetTable(table(''));resetTable(table('pack-'));
+   hasPack=false;$('packRest').hidden=true;$('packGrid').replaceChildren();
+   if(location.hash==='#pack')await route();
+   say(`Коллекция очищена · удалено видов карт: ${out.removed}`);
+  } else if(op.kind==='reset-shuffle'){
+   $('breakResult').hidden=true;
+   say('Таймер перетасовки сброшен.');
+  }
   else {
    try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
    const result=$('breakResult');result.textContent=`Получено пыли: +${out.gain}`;result.hidden=false;
@@ -293,6 +307,12 @@ function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'
 $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 for(const b of grants)b.onclick=()=>{if(canGrantSpins)transact('grant',Number(b.dataset.grant));};
+$('clearCollection').onclick=()=>{clearConfirm.returnValue='';clearConfirm.showModal();tg?.BackButton?.show();};
+clearConfirm.addEventListener('close',()=>{
+ if(targetPane()==='home')tg?.BackButton?.hide();
+ if(canGrantSpins&&clearConfirm.returnValue==='clear')transact('clear-collection',0);
+});
+$('resetShuffle').onclick=()=>{if(canGrantSpins)transact('reset-shuffle',0);};
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
 document.querySelector('main').addEventListener('click',e=>{
  const link=e.target.closest('a[href^="#"]');
@@ -300,8 +320,8 @@ document.querySelector('main').addEventListener('click',e=>{
  e.preventDefault();go(link.hash.slice(1));
 });
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
-setInterval(()=>{if(!busy)refresh();if(state&&new Date(clock()*1000).toISOString().slice(0,10)!==state.day)sync();},5000);
-tg?.BackButton?.onClick(()=>{if($('detail').open)$('detail').close();else go('home');});
+setInterval(()=>{if(!busy)refresh();if(state?.freeNextAt&&clock()>=state.freeNextAt)sync();},5000);
+tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if($('detail').open)$('detail').close();else go('home');});
 $('detail').addEventListener('close',()=>{if(targetPane()==='home')tg?.BackButton?.hide();});
 route();
 (async()=>{

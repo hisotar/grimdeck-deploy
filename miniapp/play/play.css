@@ -96,6 +96,13 @@
 .deck-tools-grid button span{font-size:22px;line-height:1;color:#d8af71}
 .deck-tool{text-align:center}
 .deck-back{display:inline-flex;align-items:center;min-height:44px;color:var(--gold);text-decoration:none}
+.deck-tool .deck-back{justify-content:center;gap:12px;min-height:58px;width:min(100%,264px);margin:8px 0 12px;padding:8px 20px;border:1px solid #96714c;border-radius:8px;background:linear-gradient(#3c2e20,#241d17);box-shadow:inset 0 0 0 3px #211912,0 4px 9px #100d0a88;color:#f0d4a5;font:700 20px/1.1 Georgia,serif}
+.deck-tool .deck-back span{font-size:30px;line-height:1}
+.deck-tool .deck-back:active{filter:brightness(.8)}
+.spin-panel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0;padding:9px 11px;border:1px solid #6d553b;border-radius:8px;background:linear-gradient(145deg,#30271d,#211f18);box-shadow:inset 0 0 0 2px #191611}
+.spin-panel b,.spin-panel small{display:block}.spin-panel b{color:#ecd1a7}.spin-panel small{color:var(--muted);font-variant-numeric:tabular-nums}.spin-panel button{flex:none;padding-inline:10px}
+.test-actions,.confirm-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .deck-tool h1,#pack h1{margin:2px 0 12px}
 .shuffle-scene{height:clamp(280px,86vw,365px);position:relative;isolation:isolate;overflow:hidden;perspective:640px;background:radial-gradient(ellipse at 50% 59%,#54402c,transparent 70%),repeating-linear-gradient(115deg,#211b16 0 2px,#251e18 3px 5px);border:1px solid #695036;border-radius:8px}
 .shuffle-scene::before{content:'';position:absolute;inset:60% 24% 7%;background:radial-gradient(ellipse,#100c09c4,transparent 72%);pointer-events:none}

@@ -43,9 +43,13 @@ CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
 DAY = 86400
 SHUFFLE_COOLDOWN = 2 * 3600
+FREE_INTERVAL = 3 * 3600
+MAX_FREE_SPINS = 5
 PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
+TEST_ACTIONS = {'grant': GRANT_SIZES, 'clear-collection': (0,), 'reset-shuffle': (0,)}
+ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), **TEST_ACTIONS}
 
 
 def schema(db):
@@ -59,18 +63,30 @@ def schema(db):
     db.commit()
 
 
+def refill_free_spins(state, now):
+    next_at = state['freeNextAt']
+    if next_at and now >= next_at:
+        earned = 1 + (now - next_at) // FREE_INTERVAL
+        state['freeSpins'] = min(MAX_FREE_SPINS, state['freeSpins'] + earned)
+        state['freeNextAt'] = 0 if state['freeSpins'] == MAX_FREE_SPINS else next_at + earned * FREE_INTERVAL
+
+
 def play(db, uid, kind, data, bonus, now):
+    # Serialize mutations and the one-time migration of legacy balances.
     if postgres(db):
-        if kind != 'state':
-            execute(db, 'SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', (uid,))
+        execute(db, 'SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', (uid,))
     else:
-        db.execute('BEGIN IMMEDIATE' if kind != 'state' else 'BEGIN')
+        db.execute('BEGIN IMMEDIATE')
     row = execute(db,'SELECT state FROM players WHERE uid=?',(uid,)).fetchone()
-    day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
-    state = json.loads(row[0]) if row else dict(day=day, used=0, spins=0, coins=bonus, dust=0, lastBreak=0, owned={})
+    state = json.loads(row[0]) if row else dict(freeSpins=MAX_FREE_SPINS, freeNextAt=0, spins=0, coins=bonus, dust=0, lastBreak=0, owned={})
     state.setdefault('spins', 0)
-    if state['day'] != day:
-        state.update(day=day, used=0)
+    if 'freeSpins' not in state:
+        day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
+        used = state.pop('used', 0)
+        free = MAX_FREE_SPINS - used if state.pop('day', None) == day else MAX_FREE_SPINS
+        state.update(freeSpins=free, freeNextAt=now + FREE_INTERVAL if free < MAX_FREE_SPINS else 0)
+        execute(db,'UPDATE players SET state=? WHERE uid=?',(json.dumps(state),uid))
+    refill_free_spins(state, now)
     def reply():
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0)
 
@@ -79,8 +95,7 @@ def play(db, uid, kind, data, bonus, now):
     op, size = data.get('op'), data.get('size', 0)
     if not isinstance(op,str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,64}',op):
         return 400, {'error':'Некорректный номер операции'}
-    sizes = {'draw': PACK_SIZES, 'break': (0,), 'grant': GRANT_SIZES}
-    if type(size) is not int or size not in sizes.get(kind, ()):
+    if type(size) is not int or size not in ACTION_SIZES.get(kind, ()):
         return 400, {'error':'Некорректный размер пакета'}
     old = execute(db,'SELECT kind,size,result FROM operations WHERE uid=? AND op=?',(uid,op)).fetchone()
     if old:
@@ -89,12 +104,14 @@ def play(db, uid, kind, data, bonus, now):
         return 200, {**reply(),**json.loads(old[2])}
     owned = state['owned']
     if kind == 'draw':
-        daily = min(size,5-state['used'])
-        extra = min(size-daily,state['spins'])
-        cost = size-daily-extra
+        free = min(size,state['freeSpins'])
+        extra = min(size-free,state['spins'])
+        cost = size-free-extra
         if cost > state['coins']:
             return 409, {'error':f"Не хватает монет: {cost-state['coins']}"}
-        state['used'] += daily; state['spins'] -= extra; state['coins'] -= cost
+        if free and not state['freeNextAt']:
+            state['freeNextAt'] = now + FREE_INTERVAL
+        state['freeSpins'] -= free; state['spins'] -= extra; state['coins'] -= cost
         cards = []
         for _ in range(size):
             roll = secrets.randbelow(100)
@@ -108,6 +125,12 @@ def play(db, uid, kind, data, bonus, now):
             return 409, {'error':f'Лимит тестовых круток: {MAX_TEST_SPINS}'}
         state['spins'] += size
         result = dict(granted=size)
+    elif kind == 'clear-collection':
+        result = dict(removed=len(owned))
+        state['owned'] = {}
+    elif kind == 'reset-shuffle':
+        state['lastBreak'] = 0
+        result = {}
     else:
         if state['lastBreak'] and now < state['lastBreak'] + SHUFFLE_COOLDOWN:
             return 409, {'error':'Перетасовка пока недоступна'}
@@ -145,7 +168,7 @@ class Play(Handler):
         self.response(404,{})
 
     def do_POST(self):
-        if self.path not in ('/api/session','/api/draw','/api/break','/api/grant'): return self.response(404,{})
+        if not self.path.startswith('/api/') or self.path[5:] not in ('session', *ACTION_SIZES): return self.response(404,{})
         if self.headers.get('Origin')!=self.server.origin: return self.response(403,{})
         try:
             n=int(self.headers.get('Content-Length','0'))
