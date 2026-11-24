@@ -5,3 +5,13 @@
 
 .album-category{margin:18px 0}.album-category-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid var(--line);font-size:1rem}.album-category-count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 :root{-webkit-tap-highlight-color:transparent}
+
+/* Light stays behind the stack, outside the rotating card. */
+#stage[data-r]::before{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;background:radial-gradient(ellipse at center,var(--tone,#b8b09e) 4%,transparent 69%);opacity:0;animation:rarity-glow 1.4s ease-out both}
+#stage[data-r=C]{--glow-peak:.32}
+#stage[data-r=R]{--glow-peak:.48}
+#stage[data-r=E]{--glow-peak:.6}
+#stage[data-r=L]{--glow-peak:.76}
+#stage[data-r=M]{--glow-peak:.92}
+@keyframes rarity-glow{0%{opacity:0;transform:scale(.72)}18%{opacity:var(--glow-peak);transform:scale(.94)}100%{opacity:0;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){#stage[data-r]::before{animation:none;opacity:.2}}

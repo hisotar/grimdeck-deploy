@@ -106,12 +106,17 @@ async function route(){
 }
 function resetTable(){
  const face=$('face');face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');face.classList.remove('new');
+ $('stage').removeAttribute('data-r');
  $('card').classList.remove('open');$('pack').hidden=true;$('packGrid').replaceChildren();
 }
 async function reveal(out){
- const entry=out.cards[out.featured], face=$('face'), holder=$('card');
+ const entry=out.cards[out.featured], face=$('face'), holder=$('card'), stage=$('stage');
  let turn,frame;
- const expose=()=>{if(!face.hidden)return;paint(face,entry.id,{fresh:entry.new});face.hidden=false;DrawSound.reveal(entry.id[4]);};
+ const expose=()=>{
+  if(!face.hidden)return;
+  paint(face,entry.id,{fresh:entry.new});face.hidden=false;
+  stage.dataset.r=entry.id[4];DrawSound.reveal(entry.id[4]);
+ };
  try{
   if(!motion.matches&&!$('home').hidden&&holder.animate){
    // Same duration, perspective and single unbroken curve as the approved Drowner.
