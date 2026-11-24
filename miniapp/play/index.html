@@ -1,6 +1,6 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header><b>✦ GRIMDECK</b><span><span id="coins">—</span> ◉ · <span id="dust">—</span> ◇</span></header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home"><p class="edition">КОЛЛЕКЦИЯ 01 · КОНТИНЕНТ</p><h1>Тропа ведьмака</h1><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
 <div class="spin-panel" aria-label="Бесплатные крутки и звук">
- <div><b id="free">Бесплатно: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small></div>
+ <div><b id="free">Бесплатно: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small><small id="rewardSpins" hidden></small></div>
  <button id="sound" type="button">Звук</button>
 </div>
 <section class="deck-tools" aria-label="Разделы колоды">
@@ -11,7 +11,7 @@
   <button type="button" data-tool="rank" aria-controls="tool-rank"><span aria-hidden="true">♜</span>Топ</button>
  </div>
 </section>
-<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Сначала расходуются бесплатные крутки, затем тестовые, затем монеты. Пакет открывается целиком.</p><p>Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
+<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Сначала расходуются бесплатные крутки, затем наградные, тестовые, затем монеты. Пакет открывается целиком.</p><p>Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
 <details id="testPanel" hidden><summary>Панель тестировщика</summary><p id="testSpins">Тестовые крутки: —</p>
  <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
 </details></section>
@@ -19,16 +19,24 @@
  <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden>
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Перетасовка</h1>
   <div id="shuffleScene" class="shuffle-scene" aria-hidden="true">
-   <div class="shuffle-stack"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+   <div class="shuffle-stack"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
    <div id="shuffleRing" class="shuffle-ring"></div>
    <div id="shuffleAir" class="shuffle-air"></div>
-   <div id="shuffleFlash" class="shuffle-flash"></div>
-   <div id="shuffleWave" class="shuffle-wave"></div>
-   <div id="shuffleSparks" class="shuffle-sparks"></div>
+   <div id="shuffleContact" class="shuffle-contact"></div>
   </div>
   <button id="break" class="primary shuffle-button" type="button" disabled>Перетасовать</button>
-  <p id="breakResult" class="shuffle-result" role="status" hidden></p>
-  <p id="breakInfo" class="shuffle-info"></p>
+  <p id="breakInfo" class="shuffle-info">Гарантированно: 1–5 пыли.</p>
+  <div id="breakResult" class="shuffle-result" role="status" hidden></div>
+  <section class="shuffle-panel" aria-labelledby="masteryTitle">
+   <h2 id="masteryTitle">Мастерство перетасовки</h2>
+   <ol id="masterySteps" class="mastery-steps" aria-label="Уровни мастерства"><li>I</li><li>II</li><li>III</li><li>IV</li></ol>
+   <p id="masteryInfo">Загружаем мастерство…</p>
+  </section>
+  <section class="shuffle-panel" aria-labelledby="shuffleLootTitle">
+   <h2 id="shuffleLootTitle">Может выпасть</h2>
+   <ul id="shuffleLoot" class="shuffle-loot"></ul>
+   <p>Не больше одного бонуса за перетасовку.</p>
+  </section>
  </section>
  <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Крафт</h1></section>

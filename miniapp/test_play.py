@@ -26,7 +26,7 @@ class FullGame(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db, db:
             return game.play(db, uid, kind, {'op':f'operation-{n:06}', 'size':size}, coins, now)
 
-    def test_retries_clock_and_dismantle(self):
+    def test_retries_clock_and_shuffle_keeps_duplicates(self):
         with patch.object(game.secrets,'randbelow',return_value=0), patch.object(game.secrets,'choice',return_value='WIT_C01'):
             status, draw = self.run_play('draw', size=10)
             self.assertEqual(status, 200)
@@ -36,17 +36,60 @@ class FullGame(unittest.TestCase):
             self.assertEqual(self.run_play('draw',size=10), (status, draw))
             self.assertEqual(self.run_play('draw',size=1)[0], 409)
             status, broken = self.run_play('break',2)
-            self.assertEqual((status,broken['gain'],broken['state']['owned']), (200,90,{'WIT_C01':1}))
+            self.assertEqual((status,broken['gain'],broken['state']['owned']), (200,2,{'WIT_C01':10}))
             self.assertEqual(self.run_play('break',2), (status,broken))
             self.assertEqual(self.run_play('draw',3,1)[0], 200)
             self.assertEqual(self.run_play('break',4,now=100000+7199)[0], 409)
             self.assertEqual(broken['shuffleReadyAt'], 107200)
             status, reshuffled = self.run_play('break',4,now=107200)
-            self.assertEqual((status, reshuffled['gain'], reshuffled['shuffleReadyAt']), (200, 10, 114400))
-            self.assertEqual(reshuffled['state']['owned'], {'WIT_C01':1})
-            self.assertEqual(reshuffled['state']['dust'], 100)
+            self.assertEqual((status, reshuffled['gain'], reshuffled['shuffleReadyAt']), (200, 2, 114400))
+            self.assertEqual(reshuffled['state']['owned'], {'WIT_C01':11})
+            self.assertEqual(reshuffled['state']['dust'], 4)
             self.assertEqual(self.run_play('state',now=100000+86400)[1]['state']['freeSpins'], 5)
             self.assertEqual(self.run_play('state',uid='B')[1]['state']['owned'], {})
+
+    def test_shuffle_bonus_ranges_and_exactly_one_reward(self):
+        checks = [(0, 'dust2', 10), (999, 'dust2', 10), (1000, 'spins', 5),
+                  (1499, 'spins', 5), (1500, 'dust10', 50), (1799, 'dust10', 50),
+                  (1800, 'legendary', 5), (1849, 'legendary', 5),
+                  (1850, 'mythic', 5), (1854, 'mythic', 5), (1855, None, 5)]
+        for roll, bonus, dust in checks:
+            with self.subTest(roll=roll), patch.object(game.secrets, 'randbelow', side_effect=[4, roll]+[0]*10):
+                uid = str(roll)
+                status, out = self.run_play('break', uid=uid)
+                self.assertEqual((status, out['bonus'], out['baseDust'], out['gain']), (200, bonus, 5, dust))
+                state = out['state']
+                self.assertEqual((state['dust'], state['rewardSpins'], state['freeSpins']), (dust, 3 if bonus == 'spins' else 0, 5))
+                if bonus in ('legendary', 'mythic'):
+                    cid = out['rewardCard']['id']
+                    self.assertEqual(cid[4], bonus[0].upper())
+                    self.assertEqual(state['owned'], {cid: 1})
+                    self.assertTrue(out['rewardCard']['new'])
+                else:
+                    self.assertEqual(state['owned'], {})
+                    self.assertNotIn('rewardCard', out)
+                self.assertEqual(self.run_play('break', uid=uid), (status, out))
+                if bonus == 'spins':
+                    _, draw = self.run_play('draw', 2, 10, uid=uid)
+                    self.assertEqual((draw['state']['freeSpins'], draw['state']['rewardSpins'], draw['state']['coins']), (0, 0, 5))
+
+    def test_mastery_levels_reset_at_utc_midnight_without_resetting_cooldown(self):
+        start = 2*game.DAY-5*game.SHUFFLE_COOLDOWN+1
+        card = 'WIT_M01'
+        for i, level in enumerate([1, 2, 3, 4, 4]):
+            at = start+i*game.SHUFFLE_COOLDOWN
+            with patch.object(game.secrets, 'randbelow', side_effect=[0, 1855*level-1]), patch.object(game.secrets, 'choice', return_value=card):
+                status, out = self.run_play('break', i+1, now=at)
+            self.assertEqual((status, out['masteryUsed'], out['bonus']), (200, level, 'mythic'))
+            self.assertEqual((out['rewardCard']['new'], out['state']['owned'][card]), (i==0, i+1))
+            self.assertEqual((out['shuffleMastery']['count'], out['shuffleMastery']['level']), (i+1, min(4, i+2)))
+        midnight = 2*game.DAY
+        _, state = self.run_play('state', now=midnight)
+        self.assertEqual((state['shuffleMastery']['count'], state['shuffleMastery']['level'], state['shuffleReadyAt']), (0, 1, midnight+1))
+        self.assertEqual(self.run_play('break', 6, now=midnight)[0], 409)
+        with patch.object(game.secrets, 'randbelow', side_effect=[0, 1855]):
+            _, out = self.run_play('break', 6, now=midnight+1)
+        self.assertEqual((out['masteryUsed'], out['bonus'], out['gain']), (1, None, 1))
 
     def test_priority_and_full_price(self):
         with patch.object(game.secrets,'randbelow',side_effect=[99,99,90,90]+[0]*7), patch.object(game.secrets,'choice',side_effect=['WIT_M01','WIT_M01','WIT_L01','WIT_L01']+['WIT_C01']*7):

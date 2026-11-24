@@ -13,6 +13,7 @@ const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
+let shuffleMastery;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -27,6 +28,7 @@ async function api(path,data){
 function accept(out){
  state=out.state;offset=out.now-Math.floor(Date.now()/1000);
  shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
+ if(out.shuffleMastery)shuffleMastery=out.shuffleMastery;
  if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
 }
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
@@ -78,29 +80,68 @@ function album(){
  });
  $('albumGrid').replaceChildren(...sections);
 }
+const loot=[
+ ['dust2','Пыль ×2','M12 2 14.5 9.5 22 12 14.5 14.5 12 22 9.5 14.5 2 12 9.5 9.5Z'],
+ ['spins','3 крутки','M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5'],
+ ['dust10','Пыль ×10','M12 2l2 7 7-2-4 5 4 5-7-2-2 7-2-7-7 2 4-5-4-5 7 2Z'],
+ ['legendary','Легендарная карта','M6 3h12v18H6zM9 12l3-4 3 4-3 4z'],
+ ['mythic','Мифическая карта','M5 3h14v18H5zM12 6l1.4 4.6L17 12l-3.6 1.4L12 18l-1.4-4.6L7 12l3.6-1.4z']
+];
+const percent=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2});
+const svgNS='http://www.w3.org/2000/svg';
+const lootRows=loot.map(([kind,label,d])=>{
+ const icon=document.createElementNS(svgNS,'svg'), path=document.createElementNS(svgNS,'path');
+ icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('class','loot-icon');icon.dataset.kind=kind;icon.setAttribute('aria-hidden','true');
+ path.setAttribute('d',d);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');
+ path.setAttribute('stroke-width','1.4');path.setAttribute('stroke-linejoin','round');path.setAttribute('stroke-linecap','round');
+ icon.append(path);
+ const item=node('li'), chance=node('b','—');item.dataset.kind=kind;item.append(icon,node('span',label),chance);$('shuffleLoot').append(item);
+ return [kind,chance];
+});
+function refreshShuffle(blocked){
+ const now=clock(), wait=Math.ceil(Math.max(0,shuffleReadyAt-now)/60);
+ $('breakInfo').textContent=`Гарантированно: 1–5 пыли. ${wait?`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`:'Повторы не нужны.'}`;
+ $('break').disabled=blocked||!!wait;
+ if(!shuffleMastery)return;
+ const expired=now>=shuffleMastery.resetsAt, count=expired?0:shuffleMastery.count, level=expired?1:shuffleMastery.level;
+ [...$('masterySteps').children].forEach((step,i)=>{if(i+1===level)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');});
+ $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: ×${level} к шансам · Сброс в 00:00 UTC`;
+ for(const [kind,chance] of lootRows)chance.textContent=`${percent.format(shuffleMastery.weights[kind]*level/100)}%`;
+}
+function showShuffleReward(out){
+ const result=$('breakResult');
+ result.dataset.kind=out.bonus||'';
+ const extra=out.rewardCard?`${out.bonus==='mythic'?'Мифическая':'Легендарная'} карта${out.rewardCard.new?' · Новая':''}`:
+  out.bonus==='spins'?'+3 наградные крутки':out.bonus==='dust2'||out.bonus==='dust10'?`Базовая пыль: ${out.baseDust} ×${out.bonus==='dust2'?2:10}`:'';
+ const title=`Получено пыли: +${out.gain}`;
+ result.replaceChildren(node('strong',title));
+ if(extra)result.append(node('div',extra));
+ if(out.rewardCard){
+  const {id}=out.rewardCard, card=node('button',cards.get(id)[1]);card.type='button';card.onclick=()=>detail(id);result.append(card);
+ }
+ result.hidden=false;
+ if(!motion.matches&&targetPane()==='tool-shuffle')result.animate?.([{opacity:.45,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:out.rewardCard?400:200,easing:'ease-out'});
+ say(targetPane()!=='tool-shuffle'?[title,extra,out.rewardCard&&cards.get(out.rewardCard.id)[1]].filter(Boolean).join(' · '):'');
+}
 function refresh(){
  if(!state)return;
- const left=state.freeSpins, spins=state.spins??0, blocked=busy||!!pending;
+ const left=state.freeSpins, spins=state.spins??0, rewardSpins=state.rewardSpins??0, blocked=busy||!!pending;
  $('coins').textContent=state.coins;$('dust').textContent=state.dust;
  const freeMinutes=Math.ceil(Math.max(0,state.freeNextAt-clock())/60);
  $('free').textContent=`Бесплатно: ${left} из 5`;
  $('freeTimer').textContent=left===5?'Запас полный · +1 каждые 3 часа':freeMinutes?`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`:'Обновляем крутки…';
+ $('rewardSpins').hidden=!rewardSpins;$('rewardSpins').textContent=`Наградные крутки: ${rewardSpins}`;
  $('testSpins').textContent=`Тестовые крутки: ${spins}`;
  if(testPanel)testPanel.hidden=!canGrantSpins;
  for(const b of grants)b.disabled=blocked||!canGrantSpins;
- for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left-spins),missing=cost-state.coins;
+ for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left-spins-rewardSpins),missing=cost-state.coins;
   b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Бесплатно'));b.disabled=blocked||missing>0;
  }
  const counts=Object.entries(state.owned);
  $('clearCollection').disabled=blocked||!canGrantSpins||!counts.length;
  $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
  $('count').textContent=`Собрано ${counts.length} из ${catalog.length} · Копий: ${counts.reduce((n,[,k])=>n+k,0)}`;
- let extra=0,gain=0;
- for(const [id,n] of counts){extra+=n-1;gain+=(n-1)*cards.get(id)[6];}
- const wait=Math.max(0,shuffleReadyAt-clock());
- const min=Math.ceil(wait/60);
- $('breakInfo').textContent=`${extra?`Лишних копий: ${extra} · Пыль: +${gain}.`:'Лишних копий пока нет.'} ${wait?`Перетасовка через ${Math.floor(min/60)} ч ${min%60} мин.`:'Один экземпляр каждой карты останется.'}`;
- $('break').disabled=blocked||!extra||!!wait;
+ refreshShuffle(blocked);
  $('retry').hidden=!pending||busy;
 }
 const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack'];
@@ -203,100 +244,67 @@ async function reveal(out){
 for(const button of toolButtons)button.onclick=()=>go(button.getAttribute('aria-controls'));
 
 async function shuffleDeck(){
- const scene=$('shuffleScene'), air=$('shuffleAir'), ring=$('shuffleRing'), flash=$('shuffleFlash');
- const wave=$('shuffleWave'), sparks=$('shuffleSparks'), stack=scene.querySelector('.shuffle-stack');
+ const scene=$('shuffleScene'), air=$('shuffleAir'), ring=$('shuffleRing'), contact=$('shuffleContact');
  if($('tool-shuffle').hidden||targetPane()!=='tool-shuffle'||motion.matches||!scene.animate){scene.dataset.phase='aligned';return;}
  const radius=Math.min(158,scene.clientWidth*.35), orbitEnd=4420*.74;
- // Alternate sides of the orbit. The gaps close as the stack gains momentum.
- const order=[5,1,6,2,7,3,0,4], landing=[4270,4350,4420,4480,4530,4574,4612,4646];
- const impact=landing.at(-1), animations=[], epoch=document.timeline.currentTime;
+ const fanEnd=orbitEnd+340, firstRelease=fanEnd+145, spacing=128, travel=240;
+ const width=Math.min(235,scene.clientWidth-106), impact=firstRelease+7*spacing+travel;
+ const animations=[], epoch=document.timeline.currentTime;
  const animate=(el,frames,options)=>{
   const animation=el.animate(frames,options);animations.push(animation);
-  if(epoch!==null)animation.startTime=epoch;
-  // Leaving the screen cancels even the layers that haven't started yet.
+  if(epoch!=null)animation.startTime=epoch;
   animation.finished.catch(()=>{});
   return animation;
  };
+ const angle=(i,t)=>2*Math.PI*(i/8+t*1.08);
+ const order=Array.from({length:8},(_,i)=>i).sort((a,b)=>Math.cos(angle(a,1))-Math.cos(angle(b,1)));
  stopScene=()=>animations.forEach(a=>a.cancel());
  try{
   const flights=Array.from({length:8},(_,i)=>{
    const card=node('i',undefined,'shuffle-flying');air.append(card);
    const pose=(x,y,z,rx,ry,rz,s=1)=>`translate3d(${x}px,${y}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${s})`;
    const orbit=t=>{
-    const a=2*Math.PI*(i/8+t*1.08), depth=Math.sin(a), side=Math.cos(a);
-    return [side*radius,depth*49-40,depth*96,side*22+12,side*38+depth*17,side*29,.66+depth*.08];
+    const a=angle(i,t), depth=Math.sin(a), side=Math.cos(a);
+    return pose(side*radius,depth*49-40,depth*96,side*22+12,side*38+depth*17,side*29,.66+depth*.08);
    };
-   const rank=order.indexOf(i), end=landing[rank];
+   const rank=order.indexOf(i), u=rank/3.5-1;
+   const release=firstRelease+rank*spacing, end=release+travel, depth=rank*3;
+   const restX=depth*-.26, restY=depth*-.28;
    const start=pose((i%3-1)*3,19-i*2,i*2,58,0,-9+(i%3-1)*4);
    const frames=[];
    const at=(ms,transform,easing='linear')=>frames.push({offset:ms/end,transform,easing});
    at(0,start);at(4420*(.015+i*.008),start,'ease-out');
    at(4420*(.12+i*.008),pose((i-3.5)*5,-39+i*4,45+i*4,31,0,-19+i*5,.86),'cubic-bezier(.32,0,.22,1)');
-   for(let step=0;step<=48;step++)at(4420*(.24+step/48*.50),pose(...orbit(step/48)));
-   const brake=190+(i*47)%155, drift=.045+brake/8600;
-   const endOrbit=orbit(1+drift);
-   for(let step=1;step<=12;step++){
-    const t=step/12;at(orbitEnd+brake*t,pose(...orbit(1+drift*(1-(1-t)**2))));
-   }
-   const [x,y,z,rx,ry,rz,scale]=endOrbit, release=end-345+rank*12;
-   // Each card has its own phase, axis and amount of play; motion starts at rest.
-   const phase=i*2.39996, gain=[.85,.48,1,.34,.72,.95,.42,.68][i];
-   const side=Math.sign(x)||1;
-   for(let step=1;step<=14;step++){
-    const t=step/14, p=t*(5.5+i*.73), amp=Math.sin(t*Math.PI/2)*gain;
-    at(orbitEnd+brake+(release-orbitEnd-brake)*t,pose(
-     x+Math.sin(p+phase)*7*amp,y+Math.cos(p*.83+phase)*5*amp,z+Math.sin(p*.69-phase)*11*amp,
-     rx+Math.cos(p+phase)*11*amp,ry+Math.sin(p*.78+phase)*15*amp,rz+Math.sin(p*1.1-phase)*8*amp,scale),
-     step===14?'cubic-bezier(.3,.02,.62,.8)':'linear');
-   }
-   const depth=Math.max(0,rank-2)*3;
-   // Arc inward, square the edge, then use the exact resting stack geometry.
-   at(release+(end-release)*.40,pose(x*.69+side*9,y*.75-22,z*.6+31,rx*.5+12,ry*.54-side*18,rz*.63+side*13,scale+.12),'cubic-bezier(.42,.05,.8,.64)');
-   at(release+(end-release)*.80,pose(x*.22,y*.22-13,depth+19,7,side*10,side*5,.95),'ease-in');
-   at(end,pose(depth*-.26,depth*-.28,depth,0,0,0));
+   for(let step=0;step<=48;step++)at(4420*(.24+step/48*.50),orbit(step/48),step===48?'cubic-bezier(.24,.68,.32,1)':'linear');
+   const fan=pose(u*width/2,-80+u*u*26,27+rank*3,8,-u*12,u*24,.77);
+   at(fanEnd,fan);at(release,fan,'cubic-bezier(.32,.13,.5,1)');
+   at(release+travel*.60,pose(u*width*.19,-25,depth+28,4,-u*4,u*8,.94),'cubic-bezier(.55,0,.82,.62)');
+   at(end,pose(restX,restY,depth,0,0,0));
    return animate(card,frames,{duration:end,fill:'both'});
   });
   scene.dataset.phase='scattered';
   animate(ring,[
    {offset:0,opacity:0,transform:'translateY(-20px) scale(.35)'},
-   {offset:.26*4420/impact,opacity:.7,transform:'translateY(-28px) scale(1)'},
-   {offset:orbitEnd/impact,opacity:.45,transform:'translateY(-28px) scale(1.05)'},
-   {offset:.91,opacity:.12,transform:'translateY(-23px) scale(.8)'},
-   {offset:1,opacity:0,transform:'translateY(-12px) scale(.62)'}
-  ],{duration:impact,fill:'both'});
-  const burst=animate(flash,[
-   {offset:0,opacity:0,transform:'scale(.8)'},
-   {offset:.038,opacity:1,transform:'scale(1)'},
-   {offset:.11,opacity:.87,transform:'scale(1.06)',easing:'ease-out'},
-   {offset:.42,opacity:.14,transform:'scale(1.19)'},
-   {offset:1,opacity:0,transform:'scale(1.32)'}
-  ],{duration:810,delay:impact-30,fill:'both'});
-  animate(wave,[
-   {opacity:0,transform:'scale(.27)'},{offset:.09,opacity:.74,transform:'scale(.43)',easing:'cubic-bezier(.12,.67,.23,1)'},
-   {offset:.67,opacity:.18,transform:'scale(1.15)'},{opacity:0,transform:'scale(1.43)'}
-  ],{duration:690,delay:impact+10,fill:'both'});
-  animate(stack,[
-   {transform:'translateY(0) scale(1)'},{offset:.18,transform:'translateY(3px) scale(1.022,.965)'},
-   {offset:.53,transform:'translateY(-1px) scale(.997,1.009)'},{transform:'translateY(0) scale(1)'}
-  ],{duration:310,delay:impact});
-  for(const [i,[dx,dy]] of [[-124,-76],[-69,-112],[31,-122],[116,-84],[149,-21],[91,45],[-87,48],[-134,12],[-26,-84],[77,-44]].entries()){
-   const spark=node('i');spark.style.setProperty('--w',`${i%3===0?8:4}px`);sparks.append(spark);
-   const x=dx*Math.min(1,scene.clientWidth/358), tilt=Math.atan2(dy,x)*180/Math.PI;
-   animate(spark,[
-    {opacity:0,transform:`translate(${x*.27}px,${dy*.25}px) rotate(${tilt}deg) scaleX(.5)`},
-    {offset:.13,opacity:i%3===0?.92:.64,transform:`translate(${x*.55}px,${dy*.55}px) rotate(${tilt}deg) scaleX(1.15)`,easing:'ease-out'},
-    {offset:.56,opacity:.4,transform:`translate(${x*.88}px,${dy*.88-3}px) rotate(${tilt}deg) scaleX(.72)`},
-    {opacity:0,transform:`translate(${x}px,${dy+18}px) rotate(${tilt+18}deg) scaleX(.23)`}
-   ],{duration:390+i%4*85,delay:impact+9+i%4*12,fill:'both'});
-  }
+   {offset:.26*4420/fanEnd,opacity:.7,transform:'translateY(-28px) scale(1)'},
+   {offset:orbitEnd/fanEnd,opacity:.45,transform:'translateY(-28px) scale(1.05)'},
+   {offset:1,opacity:0,transform:'translateY(-28px) scale(.94)'}
+  ],{duration:fanEnd,fill:'both'});
+  // Both layers share the same resting geometry, so the handoff stays visible.
+  const settle=animate(scene.querySelector('.shuffle-stack'),[
+   {transform:'translateY(0) scale(1)'},{offset:.23,transform:'translateY(2px) scale(1.012,.982)'},
+   {offset:.56,transform:'translateY(-.7px) scale(.999,1.005)'},{transform:'translateY(0) scale(1)'}
+  ],{duration:230,delay:impact,fill:'both'});
+  const light=animate(contact,[
+   {opacity:0,transform:'scale(.85)'},{offset:.23,opacity:.9,transform:'scale(1)'},{opacity:0,transform:'scale(1.22)'}
+  ],{duration:310,delay:impact+30,fill:'both'});
   await Promise.all(flights.map(a=>a.finished));
   scene.dataset.phase='aligned';
   air.replaceChildren();
-  await burst.finished;
+  await Promise.all([settle.finished,light.finished]);
  }finally{
   scene.dataset.phase='aligned';stopScene=null;
   for(const a of animations)a.cancel();
-  air.replaceChildren();sparks.replaceChildren();
+  air.replaceChildren();
  }
 }
 
@@ -338,8 +346,7 @@ async function transact(kind,size){
   }
   else {
    try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
-   const result=$('breakResult');result.textContent=`Получено пыли: +${out.gain}`;result.hidden=false;
-   say(targetPane()!=='tool-shuffle'?result.textContent:'');
+   showShuffleReward(out);
   }
  }catch(e){
   if(!pending)say('Операция сохранена, но результат не удалось показать.');

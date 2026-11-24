@@ -43,6 +43,8 @@ CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
 DAY = 86400
 SHUFFLE_COOLDOWN = 2 * 3600
+# Weights are in basis points. One roll chooses at most one bonus.
+SHUFFLE_BONUSES = {'dust2': 1000, 'spins': 500, 'dust10': 300, 'legendary': 50, 'mythic': 5}
 FREE_INTERVAL = 3 * 3600
 MAX_FREE_SPINS = 5
 PACK_SIZES = (1, 10, 50)
@@ -87,8 +89,13 @@ def play(db, uid, kind, data, bonus, now):
         state.update(freeSpins=free, freeNextAt=now + FREE_INTERVAL if free < MAX_FREE_SPINS else 0)
         execute(db,'UPDATE players SET state=? WHERE uid=?',(json.dumps(state),uid))
     refill_free_spins(state, now)
+    utc_day = now // DAY
+    shuffles = state.get('shuffleCount', 0) if state.get('shuffleDay') == utc_day else 0
+    state.setdefault('rewardSpins', 0)
     def reply():
-        return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0)
+        return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
+                    shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
+                                        weights=SHUFFLE_BONUSES))
 
     if kind == 'state':
         return 200, reply()
@@ -105,13 +112,14 @@ def play(db, uid, kind, data, bonus, now):
     owned = state['owned']
     if kind == 'draw':
         free = min(size,state['freeSpins'])
-        extra = min(size-free,state['spins'])
-        cost = size-free-extra
+        reward = min(size-free,state['rewardSpins'])
+        extra = min(size-free-reward,state['spins'])
+        cost = size-free-reward-extra
         if cost > state['coins']:
             return 409, {'error':f"Не хватает монет: {cost-state['coins']}"}
         if free and not state['freeNextAt']:
             state['freeNextAt'] = now + FREE_INTERVAL
-        state['freeSpins'] -= free; state['spins'] -= extra; state['coins'] -= cost
+        state['freeSpins'] -= free; state['rewardSpins'] -= reward; state['spins'] -= extra; state['coins'] -= cost
         cards = []
         for _ in range(size):
             roll = secrets.randbelow(100)
@@ -134,11 +142,26 @@ def play(db, uid, kind, data, bonus, now):
     else:
         if state['lastBreak'] and now < state['lastBreak'] + SHUFFLE_COOLDOWN:
             return 409, {'error':'Перетасовка пока недоступна'}
-        gain = sum((qty-1)*CARDS[cid][6] for cid,qty in owned.items())
-        if not gain:
-            return 409, {'error':'Нет лишних карт'}
-        state.update(dust=state['dust']+gain,lastBreak=now,owned=dict.fromkeys(owned,1))
-        result = dict(gain=gain)
+        level = min(4, shuffles + 1)
+        base = 1 + secrets.randbelow(5)
+        roll = secrets.randbelow(10000)
+        bonus_kind = None
+        for candidate, weight in SHUFFLE_BONUSES.items():
+            roll -= weight * level
+            if roll < 0:
+                bonus_kind = candidate
+                break
+        gain = base * {'dust2': 2, 'dust10': 10}.get(bonus_kind, 1)
+        result = dict(gain=gain, baseDust=base, bonus=bonus_kind, masteryUsed=level)
+        if bonus_kind == 'spins':
+            state['rewardSpins'] += 3
+        elif bonus_kind in ('legendary', 'mythic'):
+            cid = secrets.choice(POOLS['L' if bonus_kind == 'legendary' else 'M'])
+            qty = owned.get(cid, 0)
+            owned[cid] = qty + 1
+            result['rewardCard'] = dict(id=cid, new=not qty)
+        shuffles += 1
+        state.update(dust=state['dust']+gain, lastBreak=now, shuffleDay=utc_day, shuffleCount=shuffles)
     execute(db,'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',(uid,json.dumps(state)))
     execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',(uid,op,kind,size,json.dumps(result)))
     db.commit()
