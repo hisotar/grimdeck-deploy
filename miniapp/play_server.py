@@ -42,6 +42,7 @@ CATALOG = json.loads((ROOT/'cards.js').read_text().split('=',1)[1].strip().remov
 CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
 DAY = 86400
+SHUFFLE_COOLDOWN = 2 * 3600
 PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
@@ -70,8 +71,11 @@ def play(db, uid, kind, data, bonus, now):
     state.setdefault('spins', 0)
     if state['day'] != day:
         state.update(day=day, used=0)
+    def reply():
+        return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0)
+
     if kind == 'state':
-        return 200, {'state':state,'now':now}
+        return 200, reply()
     op, size = data.get('op'), data.get('size', 0)
     if not isinstance(op,str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,64}',op):
         return 400, {'error':'Некорректный номер операции'}
@@ -82,7 +86,7 @@ def play(db, uid, kind, data, bonus, now):
     if old:
         if old[:2] != (kind,size):
             return 409, {'error':'Операция уже использована'}
-        return 200, {'state':state,'now':now,**json.loads(old[2])}
+        return 200, {**reply(),**json.loads(old[2])}
     owned = state['owned']
     if kind == 'draw':
         daily = min(size,5-state['used'])
@@ -105,8 +109,8 @@ def play(db, uid, kind, data, bonus, now):
         state['spins'] += size
         result = dict(granted=size)
     else:
-        if state['lastBreak'] and now < state['lastBreak']+DAY:
-            return 409, {'error':'Разбор пока недоступен'}
+        if state['lastBreak'] and now < state['lastBreak'] + SHUFFLE_COOLDOWN:
+            return 409, {'error':'Перетасовка пока недоступна'}
         gain = sum((qty-1)*CARDS[cid][6] for cid,qty in owned.items())
         if not gain:
             return 409, {'error':'Нет лишних карт'}
@@ -115,7 +119,7 @@ def play(db, uid, kind, data, bonus, now):
     execute(db,'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',(uid,json.dumps(state)))
     execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',(uid,op,kind,size,json.dumps(result)))
     db.commit()
-    return 200, {'state':state,'now':now,**result}
+    return 200, {**reply(),**result}
 
 
 class Play(Handler):

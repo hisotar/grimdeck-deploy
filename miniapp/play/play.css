@@ -88,3 +88,38 @@
 }
 @keyframes new-card-slide{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
 @media(prefers-reduced-motion:reduce){#newCardPanel{animation:none}}
+
+/* The deck workshop shares the brass and leather of the draw table. */
+.deck-tools{margin:12px 0 10px;padding:8px;border:1px solid #5c4934;border-radius:10px;background:linear-gradient(150deg,#2c251b,#1c1c18 76%);box-shadow:inset 0 0 0 2px #151411}
+.deck-tools-heading{display:flex;justify-content:center;align-items:center;gap:9px;color:#d1ad79}
+.deck-tools-heading h2{margin:4px 0 8px;font-size:15px;font-weight:normal;color:#d8c5a4}
+.deck-tools-heading span{font-size:10px}
+.deck-tools-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.deck-tools-grid button{display:grid;justify-items:center;align-content:center;gap:3px;min-width:0;padding:5px 1px;min-height:52px;background:linear-gradient(#33291e,#241e18);color:#dfc9a4;font-size:clamp(9px,2.65vw,12px);overflow-wrap:anywhere}
+.deck-tools-grid button span{font-size:16px;line-height:1;color:#d8af71}
+.deck-tools-grid button[aria-expanded=true]{border-color:#bd925b;background:linear-gradient(#4a3724,#2d231a);box-shadow:inset 0 0 0 1px #c5a16c48}
+.deck-tool{margin:8px 0 0;min-height:40px;border-top:1px solid #604a34;padding:8px 2px 3px;text-align:center}
+.shuffle-scene{height:218px;position:relative;isolation:isolate;overflow:hidden;perspective:560px;background:radial-gradient(ellipse at 50% 57%,#54402c,transparent 70%);border-radius:6px}
+.shuffle-scene::before{content:'';position:absolute;inset:60% 24% 7%;background:radial-gradient(ellipse,#100c09c4,transparent 72%);pointer-events:none}
+.shuffle-stack,.shuffle-air{position:absolute;inset:0;display:grid;place-items:center;transform-style:preserve-3d}
+.shuffle-air{z-index:1;pointer-events:none}
+.shuffle-stack i,.shuffle-flying{
+ position:absolute;width:96px;height:135px;display:grid;place-items:center;border:1px solid #b89258;border-radius:7px;
+ background:repeating-linear-gradient(50deg,#3a3024 0 2px,#30261e 3px 5px);color:#d9b473;
+ box-shadow:inset 0 0 0 4px #291f18,inset 0 0 0 5px #765b3b,0 2px #8b6d48,0 4px #2d2117,0 6px 8px #100c0999;
+ font-style:normal;
+}
+.shuffle-stack i::before,.shuffle-flying::before{content:'';position:absolute;inset:12px;border:1px solid #9f784866;border-radius:3px}
+.shuffle-stack i::after,.shuffle-flying::after{content:'✦';display:grid;place-items:center;width:32px;height:32px;border:3px double #aa8050;transform:rotate(45deg);font:19px/1 Georgia,serif;text-shadow:0 0 8px #c6924a}
+.shuffle-stack i{transform:translate3d(var(--x,0px),calc(19px - var(--z,0px)),var(--z,0px)) rotateX(58deg) rotateZ(var(--angle,-9deg))}
+.shuffle-stack i:nth-child(2){--x:5px;--z:3px;--angle:-4deg}
+.shuffle-stack i:nth-child(3){--x:-3px;--z:6px;--angle:-14deg}
+.shuffle-stack i:nth-child(4){--x:4px;--z:9px;--angle:-7deg}
+.shuffle-stack i:nth-child(5){--x:-4px;--z:12px;--angle:-17deg}
+.shuffle-stack i:nth-child(6){--x:1px;--z:15px;--angle:-10deg}
+.shuffle-scene[data-phase=scattered] .shuffle-stack i:nth-child(n+2){opacity:0}
+.shuffle-scene[data-phase=aligned] .shuffle-stack i{transform:translate3d(calc(var(--z,0px) * -.26),calc(var(--z,0px) * -.28),var(--z,0px))}
+.shuffle-flash{position:absolute;inset:0;z-index:2;opacity:0;pointer-events:none;background:radial-gradient(ellipse 100px 113px at center,#fffdf2 52%,#ffe4a5 71%,transparent 100%),radial-gradient(ellipse 48% 50% at center,#ffd487,transparent),repeating-conic-gradient(from 12deg at center,transparent 0 35deg,#f6bd7566 39deg,transparent 43deg 58deg);mask-image:radial-gradient(ellipse at center,#000 41%,transparent 74%)}
+.shuffle-button{width:min(100%,202px);min-height:46px;margin:0 auto 4px;border-color:#a97d52}
+.shuffle-info,.shuffle-result{margin:6px auto 2px;max-width:34ch;font-size:12px;color:var(--muted)}
+.shuffle-result{color:var(--green);font-weight:700}

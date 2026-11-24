@@ -7,11 +7,12 @@ const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
 const grants=[...document.querySelectorAll('[data-grant]')];
 const testPanel=$('testPanel');
+const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const day=86400;
-let state, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
+let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -25,6 +26,7 @@ async function api(path,data){
 }
 function accept(out){
  state=out.state;offset=out.now-Math.floor(Date.now()/1000);
+ shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
  if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
 }
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
@@ -90,9 +92,9 @@ function refresh(){
  $('count').textContent=`Собрано ${counts.length} из ${catalog.length} · Копий: ${counts.reduce((n,[,k])=>n+k,0)}`;
  let extra=0,gain=0;
  for(const [id,n] of counts){extra+=n-1;gain+=(n-1)*cards.get(id)[6];}
- const wait=state.lastBreak?Math.max(0,state.lastBreak+day-clock()):0;
+ const wait=Math.max(0,shuffleReadyAt-clock());
  const min=Math.ceil(wait/60);
- $('breakInfo').textContent=`${extra?`Лишних копий: ${extra} · Пыль: +${gain}.`:'Лишних копий пока нет.'} ${wait?`Следующий разбор через ${Math.floor(min/60)} ч ${min%60} мин.`:'Один экземпляр каждой карты останется.'}`;
+ $('breakInfo').textContent=`${extra?`Лишних копий: ${extra} · Пыль: +${gain}.`:'Лишних копий пока нет.'} ${wait?`Перетасовка через ${Math.floor(min/60)} ч ${min%60} мин.`:'Один экземпляр каждой карты останется.'}`;
  $('break').disabled=blocked||!extra||!!wait;
  $('retry').hidden=!pending||busy;
 }
@@ -100,7 +102,7 @@ let activePane=null, transition=null, navigation=0;
 async function route(){
  const version=++navigation;
  transition?.cancel();
- const panes=['home','album','workshop'], id=panes.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+ const panes=['home','album'], id=panes.includes(location.hash.slice(1))?location.hash.slice(1):'home';
  const animate=activePane&&activePane!==id&&!motion.matches&&$(id).animate;
  if(animate){
   transition=$(activePane).animate([{opacity:1},{opacity:0}],{duration:85,fill:'forwards'});
@@ -145,6 +147,55 @@ async function reveal(out){
  if(out.cards.length>1){$('packGrid').replaceChildren(...out.cards.flatMap(({id},i)=>i===out.featured?[]:[tile(id)]));$('summary').textContent=`Новых карт: ${out.newCount} из ${out.cards.length}`;$('pack').hidden=false;}
  say(out.cards.length===1?(entry.new?'':`Повтор: ${cards.get(entry.id)[1]}`):`Открыто карт: ${out.cards.length}`);
 }
+for(const button of toolButtons)button.onclick=()=>{
+ const open=button.getAttribute('aria-expanded')!=='true';
+ for(const other of toolButtons){
+  const selected=other===button&&open;
+  other.setAttribute('aria-expanded',String(selected));
+  $(other.getAttribute('aria-controls')).hidden=!selected;
+ }
+};
+
+async function shuffleDeck(){
+ const scene=$('shuffleScene'), air=$('shuffleAir'), flash=$('shuffleFlash');
+ const visible=() => !$('home').hidden&&!$('tool-shuffle').hidden;
+ if(!visible()||motion.matches||!scene.animate){scene.dataset.phase='aligned';return;}
+ const radius=Math.min(122,scene.clientWidth*.29);
+ const animations=[];
+ const animate=(el,frames,options)=>{
+  const animation=el.animate(frames,options);animations.push(animation);return animation;
+ };
+ try{
+  const flights=Array.from({length:8},(_,i)=>{
+   const card=node('i',undefined,'shuffle-flying');air.append(card);
+   const orbit=(t,jitter=0)=>{
+    const a=2*Math.PI*(i/8+t*1.2), x=Math.cos(a)*radius+jitter;
+    return `translate3d(${x}px,${Math.sin(a)*31-23+jitter}px,${Math.sin(a)*77}px) rotateX(${25+Math.cos(a)*30}deg) rotateY(${t*360+i*19}deg) rotateZ(${Math.cos(a)*28+jitter}deg) scale(.71)`;
+   };
+   const frames=[{offset:0,transform:'translate3d(0,16px,12px) rotateX(56deg) rotateZ(-12deg)',easing:'cubic-bezier(.12,.63,.45,1)'}];
+   for(let step=0;step<=24;step++)frames.push({offset:.14+step/24*.62,transform:orbit(step/24)});
+   for(let step=1;step<=5;step++)frames.push({offset:.76+step*.028,transform:orbit(1,(step%2?1:-1)*(2+i%3)),easing:step===5?'cubic-bezier(.7,0,.94,.52)':'linear'});
+   frames.push({offset:1,transform:'translate3d(0,0,0) rotateX(0deg) rotateY(360deg) rotateZ(0deg) scale(1)'});
+   return animate(card,frames,{duration:2040,delay:i*15,fill:'both'});
+  });
+  scene.dataset.phase='scattered';
+  const burst=animate(flash,[
+   {offset:0,opacity:0,transform:'scale(.42)'},
+   {offset:.12,opacity:1,transform:'scale(.96)'},
+   {offset:.36,opacity:1,transform:'scale(1.06)'},
+   {offset:1,opacity:0,transform:'scale(1.25)'}
+  ],{duration:780,delay:1990,fill:'both'});
+  await Promise.all(flights.map(a=>a.finished));
+  scene.dataset.phase='aligned';
+  air.replaceChildren();
+  await burst.finished;
+ }finally{
+  scene.dataset.phase='aligned';
+  for(const a of animations)a.cancel();
+  air.replaceChildren();
+ }
+}
+
 // A background read must never overwrite a newer operation's state.
 let operationVersion=0;
 async function sync(){
@@ -162,13 +213,18 @@ async function transact(kind,size){
  operationVersion++;
  busy=true;refresh();
  if(pending.kind==='draw'){resetTable();DrawSound.play();}
+ if(pending.kind==='break'){$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('Сохраняем результат…');
  let conflict=false;
  try{
   const out=await api(pending.kind,{op:pending.op,size:pending.size});
   if(pending.kind==='draw')await reveal(out);
   else if(pending.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
-  else say(`Получено пыли: ${out.gain}`);
+  else {
+   try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
+   const result=$('breakResult');result.textContent=`Получено пыли: +${out.gain}`;result.hidden=false;
+   say($('home').hidden||$('tool-shuffle').hidden?result.textContent:'');
+  }
   accept(out);
   pending=null;remember();
  }catch(e){
