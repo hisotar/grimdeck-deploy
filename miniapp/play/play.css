@@ -6,12 +6,35 @@
 .album-category{margin:18px 0}.album-category-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid var(--line);font-size:1rem}.album-category-count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 :root{-webkit-tap-highlight-color:transparent}
 
-/* Light stays behind the stack, outside the rotating card. */
-#stage[data-r]::before{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;pointer-events:none;background:radial-gradient(ellipse at center,var(--tone,#b8b09e) 4%,transparent 69%);opacity:calc(var(--glow-peak) * .58);animation:rarity-glow 1.4s ease-out}
-#stage[data-r=C]{--glow-peak:.32}
-#stage[data-r=R]{--glow-peak:.48}
-#stage[data-r=E]{--glow-peak:.6}
-#stage[data-r=L]{--glow-peak:.76}
-#stage[data-r=M]{--glow-peak:.92}
-@keyframes rarity-glow{0%{opacity:0;transform:scale(.72)}18%{opacity:var(--glow-peak);transform:scale(.94)}}
-@media(prefers-reduced-motion:reduce){#stage[data-r]::before{animation:none}}
+/* Both light layers sit behind the card and never rotate with it. */
+#stage[data-r]{--light:var(--tone,#d6cbb6)}
+#stage[data-r]::before,#stage[data-r]::after{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;pointer-events:none}
+#stage[data-r]::before{
+ background:
+  radial-gradient(ellipse 112px 126px at 47% 46%,#fff3de,var(--light) 62%,transparent 100%),
+  radial-gradient(ellipse 120px 123px at 54% 58%,var(--light),transparent 100%),
+  radial-gradient(ellipse 50% 55% at 50% 51%,var(--light),transparent 100%);
+ opacity:var(--glow-rest);animation:rarity-glow 1.4s ease-out;
+}
+#stage[data-r=C]{--glow-rest:.37;--glow-peak:.56}
+#stage[data-r=R]{--glow-rest:.47;--glow-peak:.68}
+#stage[data-r=E]{--glow-rest:.56;--glow-peak:.79}
+#stage[data-r=L]{--glow-rest:.65;--glow-peak:.9}
+#stage[data-r=M]{--glow-rest:.74;--glow-peak:1}
+#stage:is([data-r=L],[data-r=M]){
+ --glow-rays:conic-gradient(from 12deg at 50% 52%,transparent 0 26deg,var(--light) 29deg,transparent 31deg 66deg,var(--light) 68deg,transparent 70deg 140deg,var(--light) 144deg,transparent 146deg 206deg,var(--light) 208deg,transparent 210deg 258deg,var(--light) 262deg,transparent 264deg 302deg,var(--light) 304deg,transparent 307deg);
+}
+#stage[data-r]::after{
+ background:
+  radial-gradient(circle 3px at 24% 32%,#fff6e5,var(--light) 34%,transparent),
+  radial-gradient(circle 2px at 29% 67%,var(--light),transparent),
+  radial-gradient(circle 4px at 76% 26%,#fff6e5,var(--light) 32%,transparent),
+  radial-gradient(circle 3px at 80% 61%,#fff6e5,var(--light) 35%,transparent),
+  radial-gradient(circle 2px at 68% 79%,var(--light),transparent),
+  var(--glow-rays,none);
+ mask-image:radial-gradient(ellipse at center,#000 45%,transparent 73%);
+ opacity:0;animation:rarity-sparks 1.05s ease-out;
+}
+@keyframes rarity-glow{0%{opacity:0;transform:scale(.8)}18%{opacity:var(--glow-peak);transform:scale(1.03)}}
+@keyframes rarity-sparks{0%{opacity:0;transform:translateY(5px) scale(.85)}23%{opacity:var(--glow-peak)}100%{opacity:0;transform:translateY(-12px) scale(1.09)}}
+@media(prefers-reduced-motion:reduce){#stage[data-r]::before{animation:none}#stage[data-r]::after{display:none}}
