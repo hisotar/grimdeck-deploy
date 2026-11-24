@@ -108,6 +108,26 @@ function refreshShuffle(blocked){
  $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: ×${level} к шансам · Сброс в 00:00 UTC`;
  for(const [kind,chance] of lootRows)chance.textContent=`${percent.format(shuffleMastery.weights[kind]*level/100)}%`;
 }
+let shuffleRevealTimer=0;
+function hideShuffleReveal(){
+ clearTimeout(shuffleRevealTimer);
+ const reveal=$('shuffleReveal');
+ reveal.hidden=true;reveal.replaceChildren();reveal.style.removeProperty('--reveal-hold');
+}
+function showShuffleReveal(out,extra,cardName){
+ hideShuffleReveal();
+ const reveal=$('shuffleReveal'), hold=out.rewardCard?5000:3000;
+ reveal.dataset.kind=out.bonus||'';
+ reveal.style.setProperty('--reveal-hold',`${hold}ms`);
+ const copy=node('div',undefined,'shuffle-reveal-copy');
+ copy.append(node('span','НАГРАДА','shuffle-reveal-label'),node('strong',`+${out.gain} пыли`));
+ if(extra)copy.append(node('span',extra,'shuffle-reveal-extra'));
+ if(cardName)copy.append(node('b',cardName,'shuffle-reveal-name'));
+ const crest=out.rewardCard?media(out.rewardCard.id):node('span','✦','shuffle-reveal-mark');
+ reveal.append(crest,copy);
+ reveal.hidden=false;
+ shuffleRevealTimer=setTimeout(hideShuffleReveal,hold+440);
+}
 function showShuffleReward(out){
  const result=$('breakResult');
  result.dataset.kind=out.bonus||'';
@@ -116,12 +136,14 @@ function showShuffleReward(out){
  const title=`Получено пыли: +${out.gain}`;
  result.replaceChildren(node('strong',title));
  if(extra)result.append(node('div',extra));
+ const cardName=out.rewardCard&&cards.get(out.rewardCard.id)[1];
  if(out.rewardCard){
-  const {id}=out.rewardCard, card=node('button',cards.get(id)[1]);card.type='button';card.onclick=()=>detail(id);result.append(card);
+  const {id}=out.rewardCard, card=node('button',cardName);card.type='button';card.onclick=()=>detail(id);result.append(card);
  }
  result.hidden=false;
- if(!motion.matches&&targetPane()==='tool-shuffle')result.animate?.([{opacity:.45,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:out.rewardCard?400:200,easing:'ease-out'});
- say(targetPane()!=='tool-shuffle'?[title,extra,out.rewardCard&&cards.get(out.rewardCard.id)[1]].filter(Boolean).join(' · '):'');
+ const onShuffle=targetPane()==='tool-shuffle'&&!$('tool-shuffle').hidden;
+ if(onShuffle)showShuffleReveal(out,extra,cardName);
+ say(onShuffle?'':[title,extra,cardName].filter(Boolean).join(' · '));
 }
 function refresh(){
  if(!state)return;
@@ -161,6 +183,7 @@ async function route(){
  const id=targetPane();
  if(location.hash==='#pack'&&!hasPack)history.replaceState(null,'','#home');
  if(activePane!==id)stopScene?.();
+ if(id!=='tool-shuffle')hideShuffleReveal();
  const animate=activePane&&activePane!==id&&!motion.matches&&$(id).animate;
  if(animate){
   transition=$(activePane).animate([{opacity:1},{opacity:0}],{duration:85,fill:'forwards'});
@@ -326,7 +349,7 @@ async function transact(kind,size){
  busy=true;refresh();
  const op=pending;
  if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
- if(op.kind==='break'){$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
+ if(op.kind==='break'){hideShuffleReveal();$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('Сохраняем результат…');
  let conflict=false;
  try{
@@ -341,7 +364,7 @@ async function transact(kind,size){
    if(location.hash==='#pack')await route();
    say(`Коллекция очищена · удалено видов карт: ${out.removed}`);
   } else if(op.kind==='reset-shuffle'){
-   $('breakResult').hidden=true;
+   hideShuffleReveal();$('breakResult').hidden=true;
    say('Таймер перетасовки сброшен.');
   }
   else {

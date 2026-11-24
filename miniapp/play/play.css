@@ -127,6 +127,28 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .shuffle-stack i:nth-child(7){--z:18px}.shuffle-stack i:nth-child(8){--z:21px}
 .shuffle-scene:not([data-phase=aligned]) .shuffle-stack i:nth-child(n+7){opacity:0}
 .shuffle-contact{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 112px 56px at 50% 65%,#dda86e75,transparent);opacity:0}
+.shuffle-reveal{
+ --reveal-light:var(--loot-tone,#efcb89);
+ position:absolute;inset:0;z-index:2;display:grid;justify-items:center;align-content:start;gap:9px;
+ padding:clamp(10px,4vw,18px) 16px 8px;pointer-events:none;color:var(--reveal-light);
+ background:radial-gradient(ellipse at 50% 27%,#63452e 0%,transparent 68%);
+ animation:shuffle-reveal-in .44s ease-out both,shuffle-reveal-out .44s var(--reveal-hold) ease-in forwards;
+}
+.shuffle-reveal[data-kind=mythic]{background:radial-gradient(ellipse at 50% 27%,#63394b 0%,transparent 68%)}
+.shuffle-reveal-copy{
+ display:grid;justify-items:center;gap:3px;min-width:0;max-width:100%;padding:8px 16px 10px;
+ border:1px solid currentColor;border-radius:8px;background:#211911f5;
+ box-shadow:0 0 22px -9px var(--reveal-light),inset 0 0 0 3px #b9955826;
+ overflow-wrap:anywhere;
+}
+.shuffle-reveal-label{font-size:10px;letter-spacing:.2em;font-weight:700}
+.shuffle-reveal-copy strong{font-size:clamp(24px,7vw,34px);line-height:1.1;color:#fff0d4;text-shadow:0 0 14px var(--reveal-light)}
+.shuffle-reveal-extra,.shuffle-reveal-name{font-size:13px}
+.shuffle-reveal-mark{font:26px/1 Georgia,serif;text-shadow:0 0 15px var(--reveal-light)}
+.shuffle-reveal .media{width:58px;height:76px;border:1px solid var(--reveal-light);box-shadow:0 0 18px -4px var(--reveal-light)}
+@keyframes shuffle-reveal-in{from{opacity:0;transform:translateY(9px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes shuffle-reveal-out{to{opacity:0}}
+@media(prefers-reduced-motion:reduce){.shuffle-reveal{animation:none}}
 .shuffle-button{width:min(100%,202px);min-height:46px;margin:10px auto 2px;border-color:#a97d52}
 .shuffle-info{margin:5px 0 10px;font-size:12px;color:var(--muted)}
 .shuffle-panel,.shuffle-result{margin:10px 0;padding:11px;border:1px solid #685138;border-radius:8px;background:linear-gradient(155deg,#32281e,#201d18);box-shadow:inset 0 0 0 2px #1a1713}
