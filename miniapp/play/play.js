@@ -39,10 +39,22 @@ function detail(id){
  box.replaceChildren(media(id),title,node('p',rarities[id[4]][0]),node('p',`Атака ${atk} · Здоровье ${hp} · Ценность ${value}`),node('p',lore),node('p',`Копий: ${qty(id)} · Пыль за лишнюю копию: ${dust}`));
  $('detail').showModal();tg?.BackButton?.show();
 }
-function paint(button,id,{fresh=false,album=false}={}){
- const [_,name]=cards.get(id), r=id[4];button.dataset.r=r;
- button.classList.toggle('new',fresh);
- button.replaceChildren(media(id,album&&!qty(id)),node('strong',name),node('small',`${rarities[r][0]}${album?(qty(id)?` · ×${qty(id)}`:' · Не открыта'):fresh?' · Новая':''}`));
+function roman(n){
+ let text='';
+ for(const [value,glyph] of [[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]){
+  while(n>=value){text+=glyph;n-=value;}
+ }
+ return text;
+}
+function paint(button,id,{album=false}={}){
+ const [_,name]=cards.get(id), r=id[4], number=roman(Number(id.slice(5))), copies=album?qty(id):0;
+ button.dataset.r=r;
+ const filigree=node('span',undefined,'tarot-filigree');filigree.setAttribute('aria-hidden','true');
+ for(let i=0;i<4;i++)filigree.append(node('i'));
+ const artwork=media(id);
+ if(copies)artwork.append(node('span',`×${copies}`,'tarot-copies'));
+ button.replaceChildren(node('span',number,'tarot-number'),artwork,node('span',name,'tarot-title'),filigree);
+ button.setAttribute('aria-label',`${name} · ${rarities[r][0]} · ${number}${copies?` · Копий: ${copies}`:''}`);
  button.onclick=()=>detail(id);
 }
 function tile(id,options){const b=node('button',undefined,'tile');b.type='button';paint(b,id,options);return b;}
@@ -105,7 +117,8 @@ async function route(){
  window.scrollTo(0,0);
 }
 function resetTable(){
- const face=$('face');face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');face.classList.remove('new');
+ const face=$('face');face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');
+ $('newCardPanel').hidden=true;
  $('stage').removeAttribute('data-r');
  $('card').classList.remove('open');$('pack').hidden=true;$('packGrid').replaceChildren();
 }
@@ -114,7 +127,7 @@ async function reveal(out){
  let turn,frame;
  const expose=()=>{
   if(!face.hidden)return;
-  paint(face,entry.id,{fresh:entry.new});face.hidden=false;
+  paint(face,entry.id);face.hidden=false;
   stage.dataset.r=entry.id[4];DrawSound.reveal(entry.id[4]);
  };
  try{
@@ -128,9 +141,9 @@ async function reveal(out){
    };
    frame=requestAnimationFrame(watchEdge);await turn.finished;
   }
- }finally{cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();$('stage').classList.remove('turning');expose();face.inert=false;}
- if(out.cards.length>1){$('packGrid').replaceChildren(...out.cards.flatMap(({id,new:fresh},i)=>i===out.featured?[]:[tile(id,{fresh})]));$('summary').textContent=`Новых карт: ${out.newCount} из ${out.cards.length}`;$('pack').hidden=false;}
- say(out.cards.length===1?`${entry.new?'Новая карта':'Повтор'}: ${cards.get(entry.id)[1]}`:`Открыто карт: ${out.cards.length}`);
+ }finally{cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();stage.classList.remove('turning');expose();face.inert=false;$('newCardPanel').hidden=!entry.new;}
+ if(out.cards.length>1){$('packGrid').replaceChildren(...out.cards.flatMap(({id},i)=>i===out.featured?[]:[tile(id)]));$('summary').textContent=`Новых карт: ${out.newCount} из ${out.cards.length}`;$('pack').hidden=false;}
+ say(out.cards.length===1?(entry.new?'':`Повтор: ${cards.get(entry.id)[1]}`):`Открыто карт: ${out.cards.length}`);
 }
 // A background read must never overwrite a newer operation's state.
 let operationVersion=0;
