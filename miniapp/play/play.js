@@ -98,11 +98,23 @@ function refresh(){
  $('break').disabled=blocked||!extra||!!wait;
  $('retry').hidden=!pending||busy;
 }
-let activePane=null, transition=null, navigation=0;
+const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack'];
+const rarityRank=new Map(rarityGroups.map(([r],i)=>[r,i]));
+let activePane=null, transition=null, navigation=0, hasPack=false, stopScene=null;
+function targetPane(){
+ const id=location.hash.slice(1);
+ return panes.includes(id)&&(id!=='pack'||hasPack)?id:'home';
+}
+function go(id){
+ if(location.hash!==`#${id}`)history.pushState(null,'',`#${id}`);
+ return route();
+}
 async function route(){
  const version=++navigation;
  transition?.cancel();
- const panes=['home','album'], id=panes.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+ const id=targetPane();
+ if(location.hash==='#pack'&&!hasPack)history.replaceState(null,'','#home');
+ if(activePane!==id)stopScene?.();
  const animate=activePane&&activePane!==id&&!motion.matches&&$(id).animate;
  if(animate){
   transition=$(activePane).animate([{opacity:1},{opacity:0}],{duration:85,fill:'forwards'});
@@ -115,82 +127,124 @@ async function route(){
  if(animate)transition=$(id).animate([{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}],{duration:165,easing:'ease-out'});
  for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
- if(id==='home')tg?.BackButton?.hide();else tg?.BackButton?.show();
+ if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
+ if(id==='home'&&!$('detail').open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo(0,0);
 }
-function resetTable(){
- const face=$('face');face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');
- $('newCardPanel').hidden=true;
- $('stage').removeAttribute('data-r');
- $('card').classList.remove('open');$('pack').hidden=true;$('packGrid').replaceChildren();
+function table(prefix){
+ return {face:$(`${prefix}face`),holder:$(`${prefix}card`),stage:$(`${prefix}stage`),label:$(`${prefix}newCardPanel`)};
 }
-async function reveal(out){
- const entry=out.cards[out.featured], face=$('face'), holder=$('card'), stage=$('stage');
+function resetTable({face,holder,stage,label}){
+ face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');
+ label.hidden=true;stage.removeAttribute('data-r');holder.classList.remove('open');
+}
+async function flip(entry,{face,holder,stage,label},pane){
  let turn,frame;
+ const visible=()=>!$(pane).hidden&&targetPane()===pane;
  const expose=()=>{
   if(!face.hidden)return;
-  paint(face,entry.id);face.hidden=false;
-  stage.dataset.r=entry.id[4];DrawSound.reveal(entry.id[4]);
+  paint(face,entry.id);face.hidden=false;stage.dataset.r=entry.id[4];
+  if(visible())DrawSound.reveal(entry.id[4]);
  };
  try{
-  if(!motion.matches&&!$('home').hidden&&holder.animate){
-   // Same duration, perspective and single unbroken curve as the approved Drowner.
+  if(!motion.matches&&visible()&&holder.animate){
+   // Preserve the approved single-card reveal curve and expose only at the edge.
    turn=holder.animate([{transform:'rotateY(0deg)'},{transform:'rotateY(180deg)'}],{duration:1350,easing:'cubic-bezier(.55,.04,.22,1)',fill:'both'});
-   $('stage').classList.add('turning');
+   stopScene=()=>turn.cancel();
+   stage.classList.add('turning');
    const watchEdge=()=>{
     if(turn.effect.getComputedTiming().progress>=0.5)expose();
     else frame=requestAnimationFrame(watchEdge);
    };
-   frame=requestAnimationFrame(watchEdge);await turn.finished;
+   frame=requestAnimationFrame(watchEdge);
+   await turn.finished.catch(()=>{});
   }
- }finally{cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();stage.classList.remove('turning');expose();face.inert=false;$('newCardPanel').hidden=!entry.new;}
- if(out.cards.length>1){$('packGrid').replaceChildren(...out.cards.flatMap(({id},i)=>i===out.featured?[]:[tile(id)]));$('summary').textContent=`Новых карт: ${out.newCount} из ${out.cards.length}`;$('pack').hidden=false;}
- say(out.cards.length===1?(entry.new?'':`Повтор: ${cards.get(entry.id)[1]}`):`Открыто карт: ${out.cards.length}`);
-}
-for(const button of toolButtons)button.onclick=()=>{
- const open=button.getAttribute('aria-expanded')!=='true';
- for(const other of toolButtons){
-  const selected=other===button&&open;
-  other.setAttribute('aria-expanded',String(selected));
-  $(other.getAttribute('aria-controls')).hidden=!selected;
+ }finally{
+  stopScene=null;cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();stage.classList.remove('turning');
+  expose();face.inert=false;label.hidden=!entry.new;
  }
-};
+}
+async function reveal(out){
+ const list=out.cards;
+ if(list.length===1){
+  const [entry]=list;
+  await flip(entry,table(''),'home');
+  say(entry.new?'':`Повтор: ${cards.get(entry.id)[1]}`);
+  return;
+ }
+ const featured=list.reduce((best,{id},i)=>rarityRank.get(id[4])<rarityRank.get(list[best].id[4])?i:best,0);
+ const scene=table('pack-');
+ resetTable(scene);
+ $('packTitle').textContent=`Результаты ×${list.length}`;
+ $('packRest').hidden=true;
+ $('packGrid').replaceChildren(...list.flatMap(({id,new:isNew},i)=>{
+  if(i===featured)return [];
+  const item=node('div',undefined,'pack-entry');item.append(tile(id));
+  if(isNew){const slot=node('div',undefined,'pack-new-slot');slot.append(node('span','Новая','new-card-label'));item.append(slot);}
+  return [item];
+ }));
+ $('summary').textContent=`Новых карт: ${out.newCount} из ${list.length}`;
+ hasPack=true;
+ say('');
+ if(targetPane()==='home')await go('pack');
+ try{await flip(list[featured],scene,'pack');}
+ finally{
+  $('packRest').hidden=false;
+  if(targetPane()!=='pack'){
+   const link=node('a',`Смотреть результаты ×${list.length}`,'notice-link');link.href='#pack';$('notice').replaceChildren(link);
+  }
+ }
+}
+for(const button of toolButtons)button.onclick=()=>go(button.getAttribute('aria-controls'));
 
 async function shuffleDeck(){
- const scene=$('shuffleScene'), air=$('shuffleAir'), flash=$('shuffleFlash');
- const visible=() => !$('home').hidden&&!$('tool-shuffle').hidden;
- if(!visible()||motion.matches||!scene.animate){scene.dataset.phase='aligned';return;}
- const radius=Math.min(122,scene.clientWidth*.29);
+ const scene=$('shuffleScene'), air=$('shuffleAir'), ring=$('shuffleRing'), flash=$('shuffleFlash');
+ if($('tool-shuffle').hidden||targetPane()!=='tool-shuffle'||motion.matches||!scene.animate){scene.dataset.phase='aligned';return;}
+ const radius=Math.min(158,scene.clientWidth*.35), duration=4420;
  const animations=[];
  const animate=(el,frames,options)=>{
-  const animation=el.animate(frames,options);animations.push(animation);return animation;
+  const animation=el.animate(frames,options);animations.push(animation);
+  // Navigation can cancel all layers at once, including the delayed flash.
+  animation.finished.catch(()=>{});
+  return animation;
  };
+ stopScene=()=>animations.forEach(a=>a.cancel());
  try{
   const flights=Array.from({length:8},(_,i)=>{
    const card=node('i',undefined,'shuffle-flying');air.append(card);
+   const pose=(x,y,z,rx,ry,rz,s=1)=>`translate3d(${x}px,${y}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg) scale(${s})`;
    const orbit=(t,jitter=0)=>{
-    const a=2*Math.PI*(i/8+t*1.2), x=Math.cos(a)*radius+jitter;
-    return `translate3d(${x}px,${Math.sin(a)*31-23+jitter}px,${Math.sin(a)*77}px) rotateX(${25+Math.cos(a)*30}deg) rotateY(${t*360+i*19}deg) rotateZ(${Math.cos(a)*28+jitter}deg) scale(.71)`;
+    const a=2*Math.PI*(i/8+t*1.08), depth=Math.sin(a), side=Math.cos(a);
+    return pose(side*radius+jitter,depth*49-40+jitter*.6,depth*96,side*22+12,side*38+depth*17,side*29+jitter,.66+depth*.08);
    };
-   const frames=[{offset:0,transform:'translate3d(0,16px,12px) rotateX(56deg) rotateZ(-12deg)',easing:'cubic-bezier(.12,.63,.45,1)'}];
-   for(let step=0;step<=24;step++)frames.push({offset:.14+step/24*.62,transform:orbit(step/24)});
-   for(let step=1;step<=5;step++)frames.push({offset:.76+step*.028,transform:orbit(1,(step%2?1:-1)*(2+i%3)),easing:step===5?'cubic-bezier(.7,0,.94,.52)':'linear'});
-   frames.push({offset:1,transform:'translate3d(0,0,0) rotateX(0deg) rotateY(360deg) rotateZ(0deg) scale(1)'});
-   return animate(card,frames,{duration:2040,delay:i*15,fill:'both'});
+   const start=pose((i%3-1)*3,19-i*2,i*2,58,0,-9+(i%3-1)*4);
+   const frames=[{offset:0,transform:start},{offset:.015+i*.008,transform:start,easing:'ease-out'},
+    {offset:.12+i*.008,transform:pose((i-3.5)*5,-39+i*4,45+i*4,31,0,-19+i*5,.86),easing:'cubic-bezier(.32,0,.22,1)'}];
+   for(let step=0;step<=48;step++)frames.push({offset:.24+step/48*.50,transform:orbit(step/48)});
+   for(let step=1;step<=8;step++)frames.push({offset:.74+step*.026,transform:orbit(1,(step%2?1:-1)*(1+step*.7+i%3)),easing:step===8?'cubic-bezier(.66,.02,.9,.55)':'linear'});
+   frames.push({offset:1,transform:pose(i*-.5,i*-.5,i*2,0,0,0)});
+   return animate(card,frames,{duration,fill:'both'});
   });
   scene.dataset.phase='scattered';
+  animate(ring,[
+   {offset:0,opacity:0,transform:'translateY(-20px) scale(.35)'},
+   {offset:.26,opacity:.7,transform:'translateY(-28px) scale(1)'},
+   {offset:.74,opacity:.45,transform:'translateY(-28px) scale(1.05)'},
+   {offset:.95,opacity:.9,transform:'translateY(-28px) scale(1)'},
+   {offset:1,opacity:0,transform:'translateY(0) scale(.2)'}
+  ],{duration,fill:'both'});
   const burst=animate(flash,[
-   {offset:0,opacity:0,transform:'scale(.42)'},
-   {offset:.12,opacity:1,transform:'scale(.96)'},
-   {offset:.36,opacity:1,transform:'scale(1.06)'},
-   {offset:1,opacity:0,transform:'scale(1.25)'}
-  ],{duration:780,delay:1990,fill:'both'});
+   {offset:0,opacity:0,transform:'scale(.56)'},
+   {offset:.07,opacity:1,transform:'scale(1)'},
+   {offset:.26,opacity:1,transform:'scale(1.1)'},
+   {offset:1,opacity:0,transform:'scale(1.45)'}
+  ],{duration:1060,delay:duration-72,fill:'both'});
   await Promise.all(flights.map(a=>a.finished));
   scene.dataset.phase='aligned';
   air.replaceChildren();
   await burst.finished;
  }finally{
-  scene.dataset.phase='aligned';
+  scene.dataset.phase='aligned';stopScene=null;
   for(const a of animations)a.cancel();
   air.replaceChildren();
  }
@@ -212,23 +266,25 @@ async function transact(kind,size){
  if(!pending){pending={kind,op:crypto.randomUUID(),size};remember();}
  operationVersion++;
  busy=true;refresh();
- if(pending.kind==='draw'){resetTable();DrawSound.play();}
- if(pending.kind==='break'){$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
+ const op=pending;
+ if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
+ if(op.kind==='break'){$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('Сохраняем результат…');
  let conflict=false;
  try{
-  const out=await api(pending.kind,{op:pending.op,size:pending.size});
-  if(pending.kind==='draw')await reveal(out);
-  else if(pending.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
+  const out=await api(op.kind,{op:op.op,size:op.size});
+  accept(out);
+  pending=null;remember();
+  if(op.kind==='draw')await reveal(out);
+  else if(op.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
   else {
    try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
    const result=$('breakResult');result.textContent=`Получено пыли: +${out.gain}`;result.hidden=false;
-   say($('home').hidden||$('tool-shuffle').hidden?result.textContent:'');
+   say(targetPane()!=='tool-shuffle'?result.textContent:'');
   }
-  accept(out);
-  pending=null;remember();
  }catch(e){
-  if(e.status===400||e.status===409){conflict=e.status===409;pending=null;remember();say(e.message);}
+  if(!pending)say('Операция сохранена, но результат не удалось показать.');
+  else if(e.status===400||e.status===409){conflict=e.status===409;pending=null;remember();say(e.message);}
   else say(e.status===401?'Открой игру заново. Запрос сохранён.':'Ответ не получен. Повтори тот же запрос: двойного списания не будет.');
  }finally{busy=false;refresh();if(!$('album').hidden)album();}
  if(conflict)sync();
@@ -238,10 +294,15 @@ $('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 for(const b of grants)b.onclick=()=>{if(canGrantSpins)transact('grant',Number(b.dataset.grant));};
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
+document.querySelector('main').addEventListener('click',e=>{
+ const link=e.target.closest('a[href^="#"]');
+ if(!link||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+ e.preventDefault();go(link.hash.slice(1));
+});
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
 setInterval(()=>{if(!busy)refresh();if(state&&new Date(clock()*1000).toISOString().slice(0,10)!==state.day)sync();},5000);
-tg?.BackButton?.onClick(()=>{if($('detail').open)$('detail').close();else location.hash='home';});
-$('detail').addEventListener('close',()=>{if(!location.hash||location.hash==='#home')tg?.BackButton?.hide();});
+tg?.BackButton?.onClick(()=>{if($('detail').open)$('detail').close();else go('home');});
+$('detail').addEventListener('close',()=>{if(targetPane()==='home')tg?.BackButton?.hide();});
 route();
 (async()=>{
  try{
