@@ -87,6 +87,15 @@ window.DrawSound = (() => {
     tone(at,510+55*variant,.116,.09,'triangle',420);
    }else if(name==='forge-ready'){
     tone(at,523.25,.22,.10,'triangle');tone(at+.056,783.99,.27,.08);
+   }else if(name==='shuffle-lift'){
+    noise(at,.19,.30,260,2100,.20,6,.17);
+    noise(at+.035,.085,.15,1500,4700,.13,7,.21);
+   }else if(name==='shuffle-orbit'){
+    noise(at,.39,.29,510,2600,.38,4,.10);
+    noise(at+.11,.18,.15,1300,3800,.29,5,.16);
+   }else if(name==='shuffle-fan'){
+    noise(at,.105,.25,950,4700,.06,8,.25);
+    noise(at+.065,.11,.17,1200,5300,.08,8,.23);
    }else if(name==='paper'){
     noise(at,.14,.23,570,4900,.16,6,.42);
    }else if(name==='shuffle-ready'){

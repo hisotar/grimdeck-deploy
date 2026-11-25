@@ -43,7 +43,7 @@ CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
 DAY = 86400
 SHUFFLE_COOLDOWN = 2 * 3600
-# Weights are in basis points. One roll chooses at most one bonus.
+# Weights are in basis points. The remainder of the roll awards ordinary dust.
 SHUFFLE_BONUSES = {'dust2': 1000, 'spins': 500, 'dust10': 300, 'legendary': 50, 'mythic': 5}
 FREE_INTERVAL = 3 * 3600
 MAX_FREE_SPINS = 5
@@ -62,6 +62,7 @@ CRAFT_RECIPES = {
     7: dict(material='dust', cost=100, boost='draw'),
     8: dict(material='dust', cost=150, boost='shuffle'),
     9: dict(material='dust', cost=200, boost='arena'),
+    10: dict(material='dust', cost=200, boost='arenaHealth'),
 }
 MAX_CRAFT_BATCH = 99
 BOOST_USES = {7: 10, 8: 4}
@@ -223,7 +224,8 @@ def play(db, uid, kind, data, bonus, now):
             if roll < 0:
                 bonus_kind = candidate
                 break
-        gain = base * {'dust2': 2, 'dust10': 10}.get(bonus_kind, 1)
+        gain = (base * {'dust2': 2, 'dust10': 10}.get(bonus_kind, 1)
+                if bonus_kind in (None, 'dust2', 'dust10') else 0)
         result = dict(gain=gain, baseDust=base, bonus=bonus_kind, masteryUsed=level)
         if bonus_kind == 'spins':
             state['rewardSpins'] += 3

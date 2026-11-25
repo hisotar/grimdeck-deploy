@@ -12,6 +12,19 @@ const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
+// Start loading before a portrait exists; share the same URL with the CSS layer.
+const frameImage=new Image();
+frameImage.src='/art/card-frame.webp';
+const frameReady=frameImage.decode().catch(()=>{});
+let frameSettled=false;
+frameReady.then(()=>{frameSettled=true;});
+async function waitForFrame(){
+ if(frameSettled)return;
+ // Never strand a confirmed draw on a slow or broken decorative asset.
+ let timer;
+ try{await Promise.race([frameReady,new Promise(resolve=>{timer=setTimeout(resolve,1800);})]);}
+ finally{clearTimeout(timer);}
+}
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
 let shuffleMastery, craftRecipes;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
@@ -101,6 +114,7 @@ function album(){
  $('albumGrid').replaceChildren(...sections);
 }
 const loot=[
+ ['dust','1–5 пыли','M12 3l4 9-4 9-4-9zM3 12h2m14 0h2'],
  ['dust2','Пыль ×2','M12 2 14.5 9.5 22 12 14.5 14.5 12 22 9.5 14.5 2 12 9.5 9.5Z'],
  ['spins','3 крутки','M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5'],
  ['dust10','Пыль ×10','M12 2l2 7 7-2-4 5 4 5-7-2-2 7-2-7-7 2 4-5-4-5 7 2Z'],
@@ -123,9 +137,11 @@ const craftIcons={
  spins:['M4 10 11 4l17 14-6 8Z M3 13h26v4a2.5 2.5 0 0 0 0 5v5H3v-5a2.5 2.5 0 0 0 0-5Z','M5 15h22M5 25h22M11 16v8M20 16l1.2 2.8L24 20l-2.8 1.2L20 24l-1.2-2.8L16 20l2.8-1.2Z'],
  draw:['M13 7V5a3 3 0 0 1 6 0v2M16 6 27 14l-3 12-8 4-8-4-3-12Z','M8 15l8-6 8 6-2 9-6 3-6-3Z M16 12l2 5 4 2-4 2-2 4-2-4-4-2 4-2Z'],
  shuffle:['M16 2 20 5l5 1 1 5 4 5-4 4-1 5-5 1-4 4-4-4-5-1-1-5-4-4 4-5 1-5 5-1Z','M8 15a8 8 0 0 1 13-5l2 2m0-5v5h-5m6 5a8 8 0 0 1-13 5l-2-2m0 5v-5h5m2-7v6m-3-3h6'],
- arena:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M13 21l8-11-4 1-6 8m-1-2 5 4m-3-2-2 3']
+ arena:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M13 21l8-11-4 1-6 8m-1-2 5 4m-3-2-2 3'],
+ arenaHealth:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M16 21l-5-5c-3-4 2-7 5-3 3-4 8-1 5 3Z']
 };
-const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','Повышает мастерство на 1 уровень на следующие 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене']};
+const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','Повышает мастерство на 1 уровень на следующие 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене'],arenaHealth:['Руна здоровья','+1 к здоровью на арене']};
+const arenaRunes=new Set(['arena','arenaHealth']);
 const materialNames={C:['обычная','обычные','обычных'],R:['редкая','редкие','редких'],E:['эпическая','эпические','эпических'],L:['легендарная','легендарные','легендарных'],M:['мифическая','мифические','мифических']};
 function craftIcon(kind){
  const icon=document.createElementNS(svgNS,'svg');
@@ -158,12 +174,18 @@ function buildCraft(){
   const button=node('button','Создать','primary craft-submit');button.type='button';
   button.setAttribute('aria-label',`Создать: ${title.textContent}`);
   const receipt=node('small',undefined,'craft-receipt');receipt.setAttribute('role','status');
-  const entry={recipe,id,amount,title,count,max,button,receipt,limit:0};
+  const steps=[5,10].map(step=>{
+   const add=node('button',`+${step}`);add.type='button';
+   add.setAttribute('aria-label',`Прибавить ${step}: ${title.textContent}`);
+   add.onclick=()=>{count.value=Math.min(entry.limit,batchCount(count.value)+step);updateRecipe(entry,busy||!!pending);};
+   return add;
+  });
+  const entry={recipe,id,amount,title,count,max,steps,button,receipt,limit:0};
   count.oninput=()=>updateRecipe(entry,busy||!!pending);
   count.onkeydown=e=>{if(e.key==='Enter'&&!button.disabled){e.preventDefault();button.click();}};
   max.onclick=()=>{count.value=entry.limit;updateRecipe(entry,busy||!!pending);};
   button.onclick=()=>{const n=Number(count.value);count.blur();transact('craft',id,n);};
-  controls.append(count,max);row.append(craftIcon(boost||'spins'),copy,button,controls,receipt);
+  controls.append(count,...steps,max);row.append(craftIcon(boost||'spins'),copy,button,controls,receipt);
   $(boost?'craftBoostList':'craftSpinList').append(row);recipeRows.push(entry);
   if(boost){
    const item=node('div',undefined,'craft-row'), info=node('div'), status=node('small');
@@ -173,13 +195,15 @@ function buildCraft(){
   }
  }
 }
-function updateRecipe({recipe,amount,title,count,max,button,limit,have},blocked){
- const n=Number(count.value), valid=/^\d{1,2}$/.test(count.value)&&n>=1&&n<=limit;
+function batchCount(value){return /^\d{1,2}$/.test(value)?Number(value):0;}
+function updateRecipe({recipe,amount,title,count,max,steps,button,limit,have},blocked){
+ const n=batchCount(count.value), valid=n>=1&&n<=limit;
  title.textContent=craftTitle(recipe,valid?n:1);
  const cost=craftCost(recipe,valid?n:1), stock=recipe.material==='dust'?` · в наличии: ${have}`:'';
  amount.textContent=limit&&!valid?`Введите от 1 до ${limit}`:`${cost}${stock}`;
  count.setAttribute('aria-invalid',String(!!limit&&!valid));
- count.disabled=blocked||!limit;max.disabled=blocked||limit<2||(valid&&n===limit);
+ count.disabled=blocked||!limit;max.disabled=blocked||!limit||(valid&&n===limit);
+ steps.forEach(add=>{add.disabled=blocked||!limit||n===limit;});
  button.disabled=blocked||!valid;
 }
 function refreshCraft(blocked){
@@ -196,8 +220,8 @@ function refreshCraft(blocked){
  }
  for(const {boost,status,button} of inventoryRows){
   const n=inventory[boost]||0, left=active[boost]||0;
-  status.textContent=`В запасе: ${n}${boost==='arena'?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`;
-  button.disabled=blocked||!n||!!left||boost==='arena';
+  status.textContent=`В запасе: ${n}${arenaRunes.has(boost)?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`;
+  button.disabled=blocked||!n||!!left||arenaRunes.has(boost);
  }
  for(const [id,kind,text] of [['drawBoost','draw',`×1,5 к шансу легендарных и мифических · 24% и 3%`],['shuffleBoost','shuffle','+1 к мастерству перетасовки']]){
   const el=$(id), left=active[kind]||0;
@@ -211,14 +235,18 @@ for(const [id,isBoost] of [['craftSpinTab',false],['craftBoostTab',true]])$(id).
 };
 function refreshShuffle(blocked){
  const now=clock(), wait=Math.ceil(Math.max(0,shuffleReadyAt-now)/60);
- $('breakInfo').textContent=`Гарантированно: 1–5 пыли. ${wait?`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`:'Повторы не нужны.'}`;
+ $('breakInfo').textContent=wait?`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`:'Готово к перетасовке. Повторы не нужны.';
  $('break').disabled=blocked||!!wait;
  if(!shuffleMastery)return;
  const expired=now>=shuffleMastery.resetsAt, count=expired?0:shuffleMastery.count, level=expired?1:shuffleMastery.level;
  [...$('masterySteps').children].forEach((step,i)=>{if(i+1===level)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');});
  const boosted=(state.activeBoosts?.shuffle||0)>0, effective=level+Number(boosted);
- $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: ×${effective} к шансам${boosted?` (временный уровень ${roman(effective)})`:''} · Сброс в 00:00 UTC`;
- for(const [kind,chance] of lootRows)chance.textContent=`${percent.format(shuffleMastery.weights[kind]*effective/100)}%`;
+ $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: мастерство ×${effective}${boosted?` (временный уровень ${roman(effective)})`:''} · Сброс в 00:00 UTC`;
+ const {weights}=shuffleMastery, total=Object.values(weights).reduce((sum,weight)=>sum+weight,0);
+ for(const [kind,chance] of lootRows){
+  const points=kind==='dust'?10000-total*effective:weights[kind]*effective;
+  chance.textContent=`${percent.format(points/100)}%`;
+ }
 }
 let shuffleRevealTimer=0;
 function hideShuffleReveal(){
@@ -226,13 +254,13 @@ function hideShuffleReveal(){
  const reveal=$('shuffleReveal');
  reveal.hidden=true;reveal.replaceChildren();reveal.style.removeProperty('--reveal-hold');
 }
-function showShuffleReveal(out,extra,cardName){
+function showShuffleReveal(out,title,extra,cardName){
  hideShuffleReveal();
  const reveal=$('shuffleReveal'), hold=out.rewardCard?5000:3000;
  reveal.dataset.kind=out.bonus||'';
  reveal.style.setProperty('--reveal-hold',`${hold}ms`);
  const copy=node('div',undefined,'shuffle-reveal-copy');
- copy.append(node('span','НАГРАДА','shuffle-reveal-label'),node('strong',`+${out.gain} пыли`));
+ copy.append(node('span','НАГРАДА','shuffle-reveal-label'),node('strong',title));
  if(extra)copy.append(node('span',extra,'shuffle-reveal-extra'));
  if(cardName)copy.append(node('b',cardName,'shuffle-reveal-name'));
  const crest=out.rewardCard?cardPortrait(out.rewardCard.id):node('span','✦','shuffle-reveal-mark');
@@ -243,9 +271,15 @@ function showShuffleReveal(out,extra,cardName){
 function showShuffleReward(out){
  const result=$('breakResult');
  result.dataset.kind=out.bonus||'';
- const extra=out.rewardCard?`${out.bonus==='mythic'?'Мифическая':'Легендарная'} карта${out.rewardCard.new?' · Новая':''}`:
-  out.bonus==='spins'?'+3 наградные крутки':out.bonus==='dust2'||out.bonus==='dust10'?`Базовая пыль: ${out.baseDust} ×${out.bonus==='dust2'?2:10}`:'';
- const title=`Получено пыли: +${out.gain}`;
+ const isSidePrize=out.rewardCard||out.bonus==='spins';
+ const title=out.rewardCard?(out.bonus==='mythic'?'Мифическая карта':'Легендарная карта'):
+  out.bonus==='spins'?'+3 крутки':`+${out.gain} пыли`;
+ const notes=[];
+ if(out.rewardCard?.new)notes.push('Новая карта');
+ if(out.bonus==='dust2'||out.bonus==='dust10')notes.push(`${out.baseDust} пыли ×${out.bonus==='dust2'?2:10}`);
+ // Saved receipts from before the change keep their original dust award on retry.
+ if(isSidePrize&&out.gain>0)notes.push(`+${out.gain} пыли по старым правилам`);
+ const extra=notes.join(' · ');
  result.replaceChildren(node('strong',title));
  if(extra)result.append(node('div',extra));
  const cardName=out.rewardCard&&cards.get(out.rewardCard.id)[1];
@@ -254,7 +288,7 @@ function showShuffleReward(out){
  }
  result.hidden=false;
  const onShuffle=targetPane()==='tool-shuffle'&&!$('tool-shuffle').hidden;
- if(onShuffle)showShuffleReveal(out,extra,cardName);
+ if(onShuffle)showShuffleReveal(out,title,extra,cardName);
  say(onShuffle?'':[title,extra,cardName].filter(Boolean).join(' · '));
 }
 function refresh(){
@@ -335,6 +369,7 @@ function resetTable({face,holder,stage,label}){
  label.hidden=true;stage.removeAttribute('data-r');holder.classList.remove('open');
 }
 async function flip(entry,{face,holder,stage,label},pane){
+ await waitForFrame();
  let turn,frame;
  const visible=()=>!$(pane).hidden&&targetPane()===pane;
  const expose=()=>{
@@ -409,8 +444,9 @@ async function shuffleDeck(){
  const angle=(i,t)=>2*Math.PI*(i/8+t*1.08);
  const order=Array.from({length:8},(_,i)=>i).sort((a,b)=>Math.cos(angle(a,1))-Math.cos(angle(b,1)));
  stopScene=()=>{animations.forEach(a=>a.cancel());timers.forEach(clearTimeout);};
- for(const ms of [110,710,1300,1950,2600,...Array.from({length:8},(_,i)=>firstRelease+i*spacing+travel*.6)])
-  timers.push(setTimeout(()=>DrawSound.cue('paper'),ms));
+ const earlyCues=[[4420*.065,'shuffle-lift'],[4420*.25,'shuffle-orbit'],[orbitEnd+165,'shuffle-fan']];
+ for(const [ms,cue] of earlyCues)timers.push(setTimeout(()=>DrawSound.cue(cue),ms));
+ for(let i=0;i<8;i++)timers.push(setTimeout(()=>DrawSound.cue('paper'),firstRelease+i*spacing+travel*.6));
  try{
   const flights=Array.from({length:8},(_,i)=>{
    const card=node('i',undefined,'shuffle-flying');air.append(card);

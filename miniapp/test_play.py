@@ -48,11 +48,11 @@ class FullGame(unittest.TestCase):
             self.assertEqual(self.run_play('state',now=100000+86400)[1]['state']['freeSpins'], 5)
             self.assertEqual(self.run_play('state',uid='B')[1]['state']['owned'], {})
 
-    def test_shuffle_bonus_ranges_and_exactly_one_reward(self):
-        checks = [(0, 'dust2', 10), (999, 'dust2', 10), (1000, 'spins', 5),
-                  (1499, 'spins', 5), (1500, 'dust10', 50), (1799, 'dust10', 50),
-                  (1800, 'legendary', 5), (1849, 'legendary', 5),
-                  (1850, 'mythic', 5), (1854, 'mythic', 5), (1855, None, 5)]
+    def test_shuffle_ranges_and_exactly_one_reward(self):
+        checks = [(0, 'dust2', 10), (999, 'dust2', 10), (1000, 'spins', 0),
+                  (1499, 'spins', 0), (1500, 'dust10', 50), (1799, 'dust10', 50),
+                  (1800, 'legendary', 0), (1849, 'legendary', 0),
+                  (1850, 'mythic', 0), (1854, 'mythic', 0), (1855, None, 5)]
         for roll, bonus, dust in checks:
             with self.subTest(roll=roll), patch.object(game.secrets, 'randbelow', side_effect=[4, roll]+[0]*10):
                 uid = str(roll)
@@ -72,6 +72,20 @@ class FullGame(unittest.TestCase):
                 if bonus == 'spins':
                     _, draw = self.run_play('draw', 2, 10, uid=uid)
                     self.assertEqual((draw['state']['freeSpins'], draw['state']['rewardSpins'], draw['state']['coins']), (0, 0, 5))
+
+    def test_legacy_shuffle_receipt_replays_without_new_rewards(self):
+        card = 'WIT_M01'
+        self.seed(dust=5, owned={card: 1}, lastBreak=100000, shuffleDay=1, shuffleCount=1)
+        receipt = dict(gain=5, baseDust=5, bonus='mythic', masteryUsed=1,
+                       rewardCard=dict(id=card, new=True))
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO operations VALUES (?,?,?,?,?)',
+                       ('A', 'operation-000001', 'break', 0, json.dumps(receipt)))
+        status, replay = self.run_play('break')
+        self.assertEqual(status, 200)
+        self.assertEqual({k: replay[k] for k in receipt}, receipt)
+        self.assertEqual((replay['state']['dust'], replay['state']['owned']), (5, {card: 1}))
+        self.assertEqual(self.run_play('break'), (status, replay))
 
     def test_mastery_levels_reset_at_utc_midnight_without_resetting_cooldown(self):
         start = 2*game.DAY-5*game.SHUFFLE_COOLDOWN+1
@@ -214,6 +228,17 @@ class FullGame(unittest.TestCase):
             self.assertEqual(self.run_play('craft', 10+recipe, recipe)[0], 409)
         self.assertEqual(self.run_play('activate-boost', 20, 9)[0], 400)
         self.assertEqual(self.run_play('state')[1]['state'], state)
+
+    def test_health_rune_batch_stays_in_inventory_until_arena(self):
+        self.seed(dust=400, boostInventory={'arena': 1})
+        status, order = self.run_play('craft', size=10, quantity=2)
+        self.assertEqual((status, order['crafted'], order['craftedQuantity']), (200, 10, 2))
+        self.assertEqual(order['state']['boostInventory'], {'arena': 1, 'arenaHealth': 2})
+        self.assertEqual(order['state']['dust'], 0)
+        self.assertEqual(self.run_play('craft', size=10, quantity=2), (status, order))
+        self.assertEqual(self.run_play('craft', 2, 10)[0], 409)
+        self.assertEqual(self.run_play('activate-boost', 2, 10)[0], 400)
+        self.assertEqual(self.run_play('state')[1]['state'], order['state'])
 
     def test_draw_boost_consumes_only_covered_cards_and_respects_retries(self):
         self.seed(boostInventory={'draw': 2}, coins=60)
