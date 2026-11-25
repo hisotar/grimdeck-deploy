@@ -92,11 +92,16 @@ function paint(button,id,eager=false){
  bindDetail(button,id);
 }
 function tile(id){const b=node('button',undefined,'tile');b.type='button';paint(b,id);return b;}
+let albumKey;
 function album(){
  if(!state)return;
+ const collected=catalog.filter(([id])=>qty(id)>0);
+ const key=collected.map(([id])=>art.has(id)?`${id}+`:id).join(',');
+ // Keep the existing image nodes and their loaded artwork on return from detail.
+ if(key===albumKey)return;
  const sections=rarityGroups.map(([r,name])=>{
   const all=catalog.filter(([id])=>id[4]===r);
-  const owned=all.filter(([id])=>qty(id)>0);
+  const owned=collected.filter(([id])=>id[4]===r);
   const section=node('section',undefined,'album-category');
   const header=node('h2',undefined,'album-category-title');
   header.append(node('span',name),node('span',`${owned.length} / ${all.length}`,'album-category-count'));
@@ -109,6 +114,7 @@ function album(){
   return section;
  });
  $('albumGrid').replaceChildren(...sections);
+ albumKey=key;
 }
 const loot=[
  ['dust','1–5 пыли','M12 3l4 9-4 9-4-9zM3 12h2m14 0h2'],
@@ -300,7 +306,11 @@ function refresh(){
  if(testPanel)testPanel.hidden=!canGrantSpins;
  for(const b of grants)b.disabled=blocked||!canGrantSpins;
  for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-total),missing=cost-state.coins;
-  b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Из запаса'));b.disabled=blocked||missing>0;
+  const available=`Доступно: ${total}`;
+  const note=missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:available;
+  b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',size===1?available:note));
+  if(size===1&&cost)b.append(node('small',note));
+  b.disabled=blocked||missing>0;
  }
  $('clearCollection').disabled=blocked||!canGrantSpins||!Object.keys(state.owned).length;
  $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
