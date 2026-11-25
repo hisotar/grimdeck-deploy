@@ -12,17 +12,12 @@ const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
-// Start loading before a portrait exists; share the same URL with the CSS layer.
-const frameImage=new Image();
-frameImage.src='/art/card-frame.webp';
-const frameReady=frameImage.decode().catch(()=>{});
-let frameSettled=false;
-frameReady.then(()=>{frameSettled=true;});
-async function waitForFrame(){
- if(frameSettled)return;
- // Never strand a confirmed draw on a slow or broken decorative asset.
+const frameUrl='/art/card-frame.webp';
+async function waitForFrame(image){
+ // Decode the actual layer that will rotate. A decorative asset must not strand a draw.
+ if(!image.decode)return;
  let timer;
- try{await Promise.race([frameReady,new Promise(resolve=>{timer=setTimeout(resolve,1800);})]);}
+ try{await Promise.race([image.decode().catch(()=>{}),new Promise(resolve=>{timer=setTimeout(resolve,1800);})]);}
  finally{clearTimeout(timer);}
 }
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
@@ -55,7 +50,9 @@ function media(id,locked=false,eager=false){
 function cardPortrait(id,eager=false){
  const portrait=node('span',undefined,'card-portrait');
  portrait.dataset.r=id[4];
- portrait.append(media(id,false,eager));
+ const frame=node('img',undefined,'card-frame');
+ frame.alt='';frame.loading=eager?'eager':'lazy';frame.onerror=()=>frame.remove();frame.src=frameUrl;
+ portrait.append(media(id,false,eager),frame);
  return portrait;
 }
 function renderDetail(id){
@@ -86,8 +83,8 @@ function roman(n){
  }
  return text;
 }
-function paint(button,id){
- const [,name]=cards.get(id), r=id[4], portrait=cardPortrait(id);
+function paint(button,id,eager=false){
+ const [,name]=cards.get(id), r=id[4], portrait=cardPortrait(id,eager);
  button.dataset.r=r;
  portrait.append(node('span',name,'tarot-title'));
  button.replaceChildren(portrait);
@@ -369,12 +366,14 @@ function resetTable({face,holder,stage,label}){
  label.hidden=true;stage.removeAttribute('data-r');holder.classList.remove('open');
 }
 async function flip(entry,{face,holder,stage,label},pane){
- await waitForFrame();
- let turn,frame;
+ // Mount the inert face before turning; backface culling hides it until the edge.
+ paint(face,entry.id,true);face.setAttribute('aria-hidden','true');face.hidden=false;
+ await waitForFrame(face.querySelector('.card-frame'));
+ let turn,frame,exposed=false;
  const visible=()=>!$(pane).hidden&&targetPane()===pane;
  const expose=()=>{
-  if(!face.hidden)return;
-  paint(face,entry.id);face.hidden=false;stage.dataset.r=entry.id[4];
+  if(exposed)return;
+  exposed=true;stage.dataset.r=entry.id[4];
   if(visible())DrawSound.reveal(entry.id[4]);
  };
  try{
@@ -392,7 +391,7 @@ async function flip(entry,{face,holder,stage,label},pane){
   }
  }finally{
   stopScene=null;cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();stage.classList.remove('turning');
-  expose();face.inert=false;label.hidden=!entry.new;
+  expose();face.removeAttribute('aria-hidden');face.inert=false;label.hidden=!entry.new;
  }
 }
 async function reveal(out){
