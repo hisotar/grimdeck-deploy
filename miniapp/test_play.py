@@ -22,9 +22,9 @@ class FullGame(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             game.schema(db)
 
-    def run_play(self, kind, n=1, size=0, *, uid='A', now=100000, coins=7):
+    def run_play(self, kind, n=1, size=0, *, uid='A', now=100000, coins=7, **params):
         with closing(sqlite3.connect(self.path)) as db, db:
-            return game.play(db, uid, kind, {'op':f'operation-{n:06}', 'size':size}, coins, now)
+            return game.play(db, uid, kind, {'op':f'operation-{n:06}', 'size':size, **params}, coins, now)
 
     def test_retries_clock_and_shuffle_keeps_duplicates(self):
         with patch.object(game.secrets,'randbelow',return_value=0), patch.object(game.secrets,'choice',return_value='WIT_C01'):
@@ -249,13 +249,42 @@ class FullGame(unittest.TestCase):
             self.assertEqual(self.run_play('break', i+2, now=now), (status, out))
             self.assertEqual(self.run_play('break', 20+i, now=now+1)[0], 409)
 
+    def test_batch_craft_spends_and_rewards_atomically(self):
+        self.seed(dust=230, owned={'WIT_C01': 17, 'WIT_C02': 5})
+        status, out = self.run_play('craft', 1, 1, quantity=3)
+        self.assertEqual((status, out['craftedQuantity'], out['state']['dust'], out['state']['rewardSpins']),
+                         (200, 3, 200, 3))
+        self.assertEqual(self.run_play('craft', 1, 1, quantity=3), (status, out))
+        self.assertEqual(self.run_play('craft', 1, 1, quantity=2)[0], 409)
+        self.assertEqual(self.run_play('craft', 2, 2, quantity=3)[0], 409)
+        self.assertEqual(self.run_play('state')[1]['state'], out['state'])
+        status, out = self.run_play('craft', 2, 2, quantity=2)
+        self.assertEqual((status, out['state']['owned'], out['state']['rewardSpins']),
+                         (200, {'WIT_C01': 1, 'WIT_C02': 1}, 7))
+        status, out = self.run_play('craft', 3, 7, quantity=2)
+        self.assertEqual((status, out['state']['dust'], out['state']['boostInventory']), (200, 0, {'draw': 2}))
+        self.assertEqual(self.run_play('craft', 3, 7, quantity=2), (status, out))
+
+    def test_craft_quantity_validated_and_legacy_operations_replay(self):
+        self.seed(dust=game.MAX_CRAFT_BATCH * 10)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO operations VALUES (?,?,?,?,?)', ('A', 'operation-000001', 'craft', 1, '{"crafted":1}'))
+        self.assertEqual(self.run_play('craft', 1, 1, quantity=1)[0], 200)
+        self.assertEqual(self.run_play('craft', 1, 1, quantity=2)[0], 409)
+        for bad in (None, True, 0, -1, 1.5, '2', game.MAX_CRAFT_BATCH + 1):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.run_play('craft', 2, 1, quantity=bad)[0], 400)
+        self.assertEqual(self.run_play('activate-boost', 2, 7, quantity=2)[0], 400)
+        status, out = self.run_play('craft', 2, 1, quantity=game.MAX_CRAFT_BATCH)
+        self.assertEqual((status, out['state']['dust'], out['state']['rewardSpins']), (200, 0, game.MAX_CRAFT_BATCH))
+
     def test_parallel_craft_does_not_double_spend(self):
-        self.seed(dust=10)
+        self.seed(dust=30)
         with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(lambda n: self.run_play('craft', n, 1)[0], (1, 2)))
+            results = list(pool.map(lambda n: self.run_play('craft', n, 1, quantity=3)[0], (1, 2)))
         self.assertEqual(sorted(results), [200, 409])
         state = self.run_play('state')[1]['state']
-        self.assertEqual((state['dust'], state['rewardSpins']), (0, 1))
+        self.assertEqual((state['dust'], state['rewardSpins']), (0, 3))
 
     def test_parallel_spending(self):
         with ThreadPoolExecutor(max_workers=2) as pool:

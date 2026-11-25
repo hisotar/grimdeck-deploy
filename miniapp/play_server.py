@@ -63,6 +63,7 @@ CRAFT_RECIPES = {
     8: dict(material='dust', cost=150, boost='shuffle'),
     9: dict(material='dust', cost=200, boost='arena'),
 }
+MAX_CRAFT_BATCH = 99
 BOOST_USES = {7: 10, 8: 4}
 DRAW_THRESHOLDS = (34, 61, 82, 98, 100)
 BOOSTED_DRAW_THRESHOLDS = (25, 52, 73, 97, 100)
@@ -114,7 +115,8 @@ def play(db, uid, kind, data, bonus, now):
     def reply():
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
-                                        weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES)
+                                        weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES,
+                    maxCraftBatch=MAX_CRAFT_BATCH)
 
     def spend_boost(boost, units):
         left = active.get(boost, 0)
@@ -132,11 +134,16 @@ def play(db, uid, kind, data, bonus, now):
         return 400, {'error':'Некорректный номер операции'}
     if type(size) is not int or size not in ACTION_SIZES.get(kind, ()):
         return 400, {'error':'Некорректный размер пакета'}
+    quantity = data.get('quantity', 1)
+    if type(quantity) is not int or not 1 <= quantity <= (MAX_CRAFT_BATCH if kind == 'craft' else 1):
+        return 400, {'error': 'Некорректное количество'}
     old = execute(db,'SELECT kind,size,result FROM operations WHERE uid=? AND op=?',(uid,op)).fetchone()
     if old:
-        if old[:2] != (kind,size):
+        # Legacy craft results describe a single recipe execution.
+        result = json.loads(old[2])
+        if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity:
             return 409, {'error':'Операция уже использована'}
-        return 200, {**reply(),**json.loads(old[2])}
+        return 200, {**reply(),**result}
     owned = state['owned']
     if kind == 'draw':
         free = min(size,state['freeSpins'])
@@ -160,7 +167,7 @@ def play(db, uid, kind, data, bonus, now):
         result = dict(cards=cards,featured=featured,newCount=sum(c['new'] for c in cards))
     elif kind == 'craft':
         recipe = CRAFT_RECIPES[size]
-        material, cost = recipe['material'], recipe['cost']
+        material, cost = recipe['material'], recipe['cost'] * quantity
         if material == 'dust':
             if state['dust'] < cost:
                 return 409, {'error': 'Не хватает пыли'}
@@ -179,11 +186,11 @@ def play(db, uid, kind, data, bonus, now):
                 if not cost:
                     break
         if 'spins' in recipe:
-            state['rewardSpins'] += recipe['spins']
+            state['rewardSpins'] += recipe['spins'] * quantity
         else:
             boost = recipe['boost']
-            inventory[boost] = inventory.get(boost, 0) + 1
-        result = dict(crafted=size)
+            inventory[boost] = inventory.get(boost, 0) + quantity
+        result = dict(crafted=size, craftedQuantity=quantity)
     elif kind == 'activate-boost':
         boost = CRAFT_RECIPES[size]['boost']
         if active.get(boost, 0):
