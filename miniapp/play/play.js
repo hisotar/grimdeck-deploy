@@ -39,14 +39,20 @@ function media(id,locked=false,eager=false){
  if(!locked&&art.has(id)){const img=new Image();img.alt='';img.loading=eager?'eager':'lazy';img.decoding='async';img.onerror=()=>img.remove();img.src=`/art/${id}.webp`;el.append(img);}
  return el;
 }
+function cardPortrait(id,eager=false){
+ const portrait=node('span',undefined,'card-portrait');
+ portrait.dataset.r=id[4];
+ portrait.append(media(id,false,eager));
+ return portrait;
+}
 function renderDetail(id){
  const [,name,lore,atk,hp,value,dust]=cards.get(id), [rarity,mark]=rarities[id[4]];
  $('detail').dataset.r=id[4];
- $('detailArt').replaceChildren(media(id,false,true));
+ $('detailArt').replaceChildren(cardPortrait(id,true));
  $('detailTitle').textContent=name;
  $('detailRarity').textContent=`${mark} ${rarity}`;
  $('detailLore').textContent=lore;
- $('detailStats').replaceChildren(...[['Атака',atk],['Здоровье',hp],['Ценность',value],['Копии',qty(id)],['Пыль за лишнюю копию',dust]].map(([label,value])=>{
+ $('detailStats').replaceChildren(...[['Атака',atk],['Здоровье',hp],['Ценность',value],['Пыль за лишнюю копию',dust]].map(([label,value])=>{
   const stat=node('div');stat.append(node('dt',label),node('dd',value));return stat;
  }));
 }
@@ -67,18 +73,15 @@ function roman(n){
  }
  return text;
 }
-function paint(button,id,{album=false}={}){
- const [_,name]=cards.get(id), r=id[4], number=roman(Number(id.slice(5))), copies=album?qty(id):0;
+function paint(button,id){
+ const [,name]=cards.get(id), r=id[4], portrait=cardPortrait(id);
  button.dataset.r=r;
- const filigree=node('span',undefined,'tarot-filigree');filigree.setAttribute('aria-hidden','true');
- for(let i=0;i<4;i++)filigree.append(node('i'));
- const artwork=media(id);
- if(copies)artwork.append(node('span',`×${copies}`,'tarot-copies'));
- button.replaceChildren(node('span',number,'tarot-number'),artwork,node('span',name,'tarot-title'),filigree);
- button.setAttribute('aria-label',`${name} · ${rarities[r][0]} · ${number}${copies?` · Копий: ${copies}`:''}`);
+ portrait.append(node('span',name,'tarot-title'));
+ button.replaceChildren(portrait);
+ button.setAttribute('aria-label',`${name} · ${rarities[r][0]}`);
  bindDetail(button,id);
 }
-function tile(id,options){const b=node('button',undefined,'tile');b.type='button';paint(b,id,options);return b;}
+function tile(id){const b=node('button',undefined,'tile');b.type='button';paint(b,id);return b;}
 function album(){
  if(!state)return;
  const sections=rarityGroups.map(([r,name])=>{
@@ -90,7 +93,7 @@ function album(){
   section.append(header);
   if(owned.length){
    const grid=node('div',undefined,'grid');
-   grid.append(...owned.map(([id])=>tile(id,{album:true})));
+   grid.append(...owned.map(([id])=>tile(id)));
    section.append(grid);
   }
   return section;
@@ -173,7 +176,8 @@ function buildCraft(){
 function updateRecipe({recipe,amount,title,count,max,button,limit,have},blocked){
  const n=Number(count.value), valid=/^\d{1,2}$/.test(count.value)&&n>=1&&n<=limit;
  title.textContent=craftTitle(recipe,valid?n:1);
- amount.textContent=limit?(valid?`${craftCost(recipe,n)} · в наличии: ${have}`:`Введите от 1 до ${limit}`):`${craftCost(recipe)} · в наличии: ${have}`;
+ const cost=craftCost(recipe,valid?n:1), stock=recipe.material==='dust'?` · в наличии: ${have}`:'';
+ amount.textContent=limit&&!valid?`Введите от 1 до ${limit}`:`${cost}${stock}`;
  count.setAttribute('aria-invalid',String(!!limit&&!valid));
  count.disabled=blocked||!limit;max.disabled=blocked||limit<2||(valid&&n===limit);
  button.disabled=blocked||!valid;
@@ -231,7 +235,7 @@ function showShuffleReveal(out,extra,cardName){
  copy.append(node('span','НАГРАДА','shuffle-reveal-label'),node('strong',`+${out.gain} пыли`));
  if(extra)copy.append(node('span',extra,'shuffle-reveal-extra'));
  if(cardName)copy.append(node('b',cardName,'shuffle-reveal-name'));
- const crest=out.rewardCard?media(out.rewardCard.id):node('span','✦','shuffle-reveal-mark');
+ const crest=out.rewardCard?cardPortrait(out.rewardCard.id):node('span','✦','shuffle-reveal-mark');
  reveal.append(crest,copy);
  reveal.hidden=false;
  shuffleRevealTimer=setTimeout(hideShuffleReveal,hold+440);

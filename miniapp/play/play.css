@@ -39,45 +39,20 @@
 @keyframes rarity-sparks{0%{opacity:0;transform:translateY(5px) scale(.85)}23%{opacity:var(--glow-peak)}100%{opacity:0;transform:translateY(-12px) scale(1.09)}}
 @media(prefers-reduced-motion:reduce){.draw-stage[data-r]::before{animation:none}.draw-stage[data-r]::after{display:none}}
 
-/* Etched brass over dark leather; the artwork stays in its own window. */
-.front,.tile{
- --brass:#ae8b58;--ivory:#f8e8c9;--foil:var(--tone,#c4a879);
- --etch:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 29V2h27 M5 24V5h19 M8 21c0-8 5-13 13-13-1 4-3 6-7 6 0 4-2 6-6 7Z M8 21c2-5 6-10 13-13 M9 10l1-2 2 1-1 2Z' fill='none' stroke='%23cba36b' stroke-width='1'/%3E%3Cpath d='M3 3l4 4-4 4ZM20 3l3 2-3 2-3-2Z' fill='%23dfbb7d'/%3E%3C/svg%3E");
- position:relative;isolation:isolate;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
- gap:0;padding:7px;border-radius:8px;border:1px solid var(--foil);
- background:linear-gradient(145deg,#453421,#211913 47%,#3c2b1c);
- box-shadow:inset 0 0 0 2px #16110d,inset 0 0 0 3px #785d3c,0 4px 10px #0c0b08a0;
-}
-.front{position:absolute;padding:11px}
-.tile{height:clamp(142px,43vw,196px)}
-.tarot-filigree{position:absolute;inset:4px;border:1px solid #a988536b;border-radius:4px;pointer-events:none;z-index:2}
-.tarot-filigree i{position:absolute;width:21px;height:21px;background:var(--etch) center/contain no-repeat}
-.front .tarot-filigree i{width:30px;height:30px}
-.tarot-filigree i:nth-child(1){top:0;left:0}
-.tarot-filigree i:nth-child(2){top:0;right:0;transform:scaleX(-1)}
-.tarot-filigree i:nth-child(3){bottom:0;right:0;transform:scale(-1)}
-.tarot-filigree i:nth-child(4){bottom:0;left:0;transform:scaleY(-1)}
-.tarot-number{
- justify-self:center;position:relative;z-index:1;min-width:33%;padding:2px 3px 3px;
- border:1px solid var(--brass);border-radius:50% 50% 32% 32% / 25%;background:linear-gradient(#483320,#211711);
- color:var(--ivory);font:700 9px/1 Georgia,serif;letter-spacing:.06em;
-}
-.front .tarot-number{font-size:13px;padding:3px 6px 4px}
-:is(.tile,.front) .media{
- min-height:0;border-radius:38% 38% 5px 5px / 15% 15% 5px 5px;border:1px solid var(--brass);
- background:radial-gradient(ellipse at 50% 36%,#47392b,#231c17 60%,#161210);
- box-shadow:inset 0 0 0 2px #1a130e;font-size:28px;
-}
-.front .media{font-size:46px}
-.tarot-copies{position:absolute;right:3px;bottom:3px;padding:2px 4px;border:1px solid #a88a61;border-radius:3px;background:#211914;color:var(--ivory);font:700 10px/1.1 system-ui,sans-serif}
+/* The shared frame supplies the ornament; the old rarity edge remains. */
+.front,.tile{display:grid;grid-template:1fr / minmax(0,1fr);padding:0;border:1px solid var(--tone,#746358);border-radius:7px;background:#181414;box-shadow:0 4px 10px #0c0b08a0;overflow:hidden}
+.tile{width:100%;min-height:0;height:auto;aspect-ratio:2 / 3}
+.card-portrait{position:relative;isolation:isolate;display:grid;place-items:center;width:100%;height:100%;min-height:0;border-radius:inherit;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,#3d302e,#171315 80%)}
+.card-portrait::after{content:'';position:absolute;inset:0;z-index:1;background:url('/art/card-frame.webp') center / 100% 100% no-repeat;pointer-events:none}
+.card-portrait .media{position:absolute;inset:0;min-height:0;border-radius:0;background:none}
+.front .card-portrait .media{font-size:46px}
 .tarot-title{
- display:block;position:relative;margin:3px 1px 0;padding:5px 4px 4px;
- border-block:1px solid var(--brass);background:linear-gradient(90deg,#2d2016,#483321 50%,#2d2016);
- color:var(--ivory);font:700 clamp(10px,2.6vw,13px)/1.13 Georgia,serif;text-wrap:balance;text-shadow:0 1px 1px #100b07;
+ position:absolute;z-index:2;inset:auto 10% 6%;padding:4px 3px;
+ border:1px solid #9e8377;border-radius:3px;background:linear-gradient(#422b2a,#211619);
+ box-shadow:inset 0 0 0 1px #342528,0 2px 5px #0b0809bb;color:#fae8dc;
+ font:700 clamp(10px,2.7vw,13px)/1.12 Georgia,serif;text-align:center;text-wrap:balance;overflow-wrap:anywhere;text-shadow:0 1px 2px #170c0c;
 }
-.tarot-title::before,.tarot-title::after{content:'';position:absolute;width:3px;height:3px;top:-2px;left:22%;background:#e2bc7b;transform:rotate(45deg)}
-.tarot-title::after{left:auto;right:22%}
-.front .tarot-title{font-size:17px;padding:8px 6px 7px}
+.front .tarot-title{font-size:clamp(15px,4.6vw,19px);padding:7px 5px}
 
 .draw-stage{margin-bottom:12px}
 .new-card-slot{position:absolute;z-index:1;top:calc(50% + var(--card-height) / 2);left:50%;width:calc(var(--card-width) - 36px);transform:translateX(-50%);overflow:hidden;pointer-events:none}
@@ -153,7 +128,7 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .shuffle-reveal-copy strong{font-size:clamp(24px,7vw,34px);line-height:1.1;color:#fff0d4;text-shadow:0 0 14px var(--reveal-light)}
 .shuffle-reveal-extra,.shuffle-reveal-name{font-size:13px}
 .shuffle-reveal-mark{font:26px/1 Georgia,serif;text-shadow:0 0 15px var(--reveal-light)}
-.shuffle-reveal .media{width:58px;height:76px;border:1px solid var(--reveal-light);box-shadow:0 0 18px -4px var(--reveal-light)}
+.shuffle-reveal .card-portrait{width:54px;height:81px;border:1px solid var(--reveal-light);border-radius:4px;box-shadow:0 0 18px -4px var(--reveal-light)}
 @keyframes shuffle-reveal-in{from{opacity:0;transform:translateY(9px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes shuffle-reveal-out{to{opacity:0}}
 @media(prefers-reduced-motion:reduce){.shuffle-reveal{animation:none}}
@@ -259,8 +234,9 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .card-view{display:grid;gap:12px;min-width:0;margin:0;padding-bottom:max(16px,env(safe-area-inset-bottom));--card-accent:var(--tone,#d6cbb6)}
 .card-view-art,.card-view-copy,.card-view-actions{min-width:0;border:1px solid #69543c;border-radius:11px;box-shadow:inset 0 0 0 3px #16141080}
 .card-view-art{display:grid;place-items:center;padding:14px;background:radial-gradient(ellipse at 50% 45%,#534030,#28221c 62%,#1b1c18)}
-.card-view-art .media{width:min(100%,350px);height:clamp(280px,105vw,500px);border:1px solid var(--card-accent);border-radius:8px;background:radial-gradient(ellipse at 50% 40%,#392e24,#151411 82%);box-shadow:0 0 27px #080705aa,inset 0 0 0 3px #1a130e;color:var(--card-accent);font-size:72px}
-.card-view-art img{object-fit:contain}
+.card-view-art .card-portrait{width:min(100%,330px);height:auto;aspect-ratio:2 / 3;border:1px solid var(--card-accent);border-radius:8px;box-shadow:0 0 27px #080705aa}
+.card-view-art .media{font-size:72px}
+.card-view-art img{inset:13% 7% 9%;width:86%;height:78%;object-fit:contain}
 .card-view-copy{padding:17px 14px;background:linear-gradient(145deg,#36291e,#221e19 65%);text-align:center;overflow-wrap:anywhere}
 .card-view-rarity{display:inline-block;margin:0 0 8px;padding:3px 10px;border:1px solid currentColor;border-radius:20px;color:var(--card-accent);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .card-view h1{color:#ffebc9;font-size:clamp(25px,7vw,34px);line-height:1.1;text-wrap:balance}
