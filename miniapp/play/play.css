@@ -99,8 +99,16 @@
 .deck-tool .deck-back{justify-content:center;gap:12px;min-height:58px;width:min(100%,264px);margin:8px 0 12px;padding:8px 20px;border:1px solid #96714c;border-radius:8px;background:linear-gradient(#3c2e20,#241d17);box-shadow:inset 0 0 0 3px #211912,0 4px 9px #100d0a88;color:#f0d4a5;font:700 20px/1.1 Georgia,serif}
 .deck-arrow{display:block;flex:none;width:20px;height:20px}.deck-tool .deck-arrow{width:30px;height:30px}
 .deck-tool .deck-back:active{filter:brightness(.8)}
-.spin-panel{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0;padding:9px 11px;border:1px solid #6d553b;border-radius:8px;background:linear-gradient(145deg,#30271d,#211f18);box-shadow:inset 0 0 0 2px #191611}
-.spin-panel b,.spin-panel small{display:block}.spin-panel b{color:#ecd1a7}.spin-panel small{color:var(--muted);font-variant-numeric:tabular-nums}.spin-panel button{flex:none;padding-inline:10px}
+.game-header{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:0 0 8px}
+.game-brand{display:flex;justify-content:space-between;align-items:center;gap:8px;letter-spacing:.08em}
+.game-brand button{min-height:44px;padding-inline:10px;font-size:12px;letter-spacing:normal}
+.wallet{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0;overflow:hidden;text-align:center;border:1px solid #806343;border-radius:9px;background:#694e33}
+.wallet div{padding:6px 3px;background:linear-gradient(155deg,#3a2a1c,#28211a)}
+.wallet div:first-child{background:linear-gradient(155deg,#4e3520,#322518)}
+.wallet dt{font-size:12px;color:#efd2a8}
+.wallet dd{margin:0;color:#fff0d5;font-size:clamp(17px,5vw,23px);font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.spin-panel{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin:9px 0;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.spin-panel b{color:#ecd1a7}.spin-panel small{font-size:inherit}
 .test-actions,.confirm-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .deck-tool h1,#pack h1{margin:2px 0 12px}
@@ -192,7 +200,7 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 @media(prefers-reduced-motion:reduce){.craft-item{animation:none}}
 .craft-icon{display:block;width:32px;height:32px;padding:3px;color:#f1c580;background:#3b2c20;border:1px solid #865d3a;border-radius:7px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
 .craft-icon[data-kind=draw]{color:#f2d693}.craft-icon[data-kind=shuffle]{color:#9fe0cb}.craft-icon[data-kind=arena]{color:#efa287}
-.craft-result{min-height:1.45em;margin:12px 0 10px;color:#ead4ac}
+.craft-hint{margin:3px 0 9px;color:var(--muted);font-size:12px}
 .craft-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:0 0 8px}
 .craft-switch [aria-pressed=true]{background:#523721;color:#ffe7ba;border-color:#c5985c}
 .craft-list{text-align:left;display:grid;gap:5px}
@@ -202,17 +210,17 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .boost-status{padding:8px;border:1px solid #8f734d;border-radius:6px;background:#36271a;color:#f4d493;font-size:12px;font-weight:700}
 @media(max-width:340px){.craft-row{gap:5px;padding:6px}.craft-row .craft-icon{width:26px;height:26px}.craft-row button{padding-inline:5px}}
 .shuffle-ring{position:absolute;inset:27% 7%;border:1px solid #e5b47588;border-radius:50%;opacity:0;pointer-events:none;box-shadow:0 0 19px #e7a7485c,inset 0 0 19px #e7a7485c}
-/* One open recipe keeps the work order readable on narrow screens. */
-.craft-recipe{display:block;padding:0}
-.craft-pick{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:9px;text-align:left;border:0;background:transparent}
-.craft-pick[aria-expanded=true]{background:#473221;border-radius:7px 7px 0 0}
-.craft-chevron{font-size:18px;line-height:1;color:#e0bb82}
-.craft-pick[aria-expanded=true] .craft-chevron{transform:rotate(180deg)}
-.craft-order{display:grid;gap:8px;padding:10px;border-top:1px solid #705238;background:#241d17;border-radius:0 0 7px 7px}
-.craft-totals{margin:0;color:#f2dfbe;font-size:13px}
-.craft-stepper{display:grid;grid-template-columns:44px minmax(40px,auto) 44px minmax(54px,1fr);align-items:center;gap:6px}
-.craft-stepper output{text-align:center;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
-.craft-order .craft-submit{color:#221a11;font-size:14px}
+.craft-recipe{grid-template-columns:auto minmax(0,1fr) auto;gap:4px 7px}
+.craft-recipe strong{font-size:15px}
+.craft-recipe .craft-submit{color:#221a11;padding-inline:8px}
+.craft-quantity{grid-column:2/-1;display:flex;align-items:center;gap:4px}
+.craft-quantity input{width:48px;min-height:44px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
+.craft-quantity input[aria-invalid=true]{border-color:#efa38f}
+.craft-quantity button{padding-inline:8px}
+.craft-recipe .craft-receipt{grid-column:2/-1;margin:0;color:var(--green)}
+.craft-receipt:empty{display:none}
+.craft-overlay{position:fixed;z-index:9;inset:0;display:grid;place-items:center;padding:12px;background:#120c08b5;pointer-events:none}
+.craft-overlay .craft-bench{width:min(100%,390px);height:min(56dvh,230px)}
 .craft-icon{--metal:#d0a166;--rim:#f7d9a0;--ink:#2d2019;width:38px;height:38px;padding:4px;stroke-width:1.35;border-radius:8px;background:linear-gradient(150deg,#4b3628,#251d19);box-shadow:inset 0 1px #fff2cc22,0 2px 4px #0d0907a0}
 .craft-icon[data-kind=draw]{--metal:#d7b563;--rim:#ffe2a0}
 .craft-icon[data-kind=shuffle]{--metal:#8dbdb1;--rim:#ccf1df}
@@ -224,5 +232,4 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .craft-item .craft-icon{width:54px;height:54px;background:transparent;box-shadow:none;border:0}
 .craft-item small{font-size:10px;letter-spacing:.16em;color:#e6bd85}
 .craft-item b{font:700 clamp(16px,5vw,21px)/1.1 Georgia,serif}
-.craft-result{min-height:2.9em;display:grid;place-items:center;text-wrap:balance}
-@media(max-width:340px){.craft-recipe{padding:0}.craft-pick{gap:6px}.craft-row .craft-icon{width:32px;height:32px}}
+@media(max-width:340px){.craft-row .craft-icon{width:30px;height:30px}.craft-recipe .craft-submit,.craft-quantity button{padding-inline:6px}}

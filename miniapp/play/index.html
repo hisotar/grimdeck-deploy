@@ -1,8 +1,12 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header><b>✦ GRIMDECK</b><span><span id="coins">—</span> ◉ · <span id="dust">—</span> ◇</span></header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home"><p class="edition">КОЛЛЕКЦИЯ 01 · КОНТИНЕНТ</p><h1>Тропа ведьмака</h1><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
-<div class="spin-panel" aria-label="Бесплатные крутки и звук">
- <div><b id="free">Бесплатно: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small><small id="rewardSpins" hidden></small></div>
- <button id="sound" type="button">Звук</button>
-</div>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header class="game-header">
+ <div class="game-brand"><b>✦ GRIMDECK</b><button id="sound" type="button">Звук</button></div>
+ <dl class="wallet" aria-label="Баланс">
+  <div><dt>Крутки</dt><dd id="totalSpins">—</dd></div>
+  <div><dt>Пыль</dt><dd id="dust">—</dd></div>
+  <div><dt>Монеты</dt><dd id="coins">—</dd></div>
+ </dl>
+</header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home"><p class="edition">КОЛЛЕКЦИЯ 01 · КОНТИНЕНТ</p><h1>Тропа ведьмака</h1><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"><span>✦</span></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true">✦</div><button type="button" id="face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
+<div class="spin-panel" aria-label="Пополнение бесплатных круток"><b id="free">Бесплатные: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small></div>
 <p id="drawBoost" class="boost-status" hidden></p>
 <section class="deck-tools" aria-label="Разделы колоды">
  <div class="deck-tools-grid">
@@ -12,7 +16,7 @@
   <button type="button" data-tool="rank" aria-controls="tool-rank"><span aria-hidden="true">♜</span>Топ</button>
  </div>
 </section>
-<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Сначала расходуются бесплатные крутки, затем наградные, тестовые, затем монеты. Пакет открывается целиком.</p><p id="drawChances">Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
+<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Счётчик «Крутки» показывает все крутки в запасе, включая полученные за крафт и перетасовку. Монеты расходуются только на недостающие крутки. Пакет открывается целиком.</p><p id="drawChances">Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
 <details id="testPanel" hidden><summary>Панель тестировщика</summary><p id="testSpins">Тестовые крутки: —</p>
  <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
 </details></section>
@@ -43,13 +47,13 @@
  </section>
  <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Крафт</h1>
-  <div id="craftBench" class="craft-bench" aria-hidden="true">
+  <div id="craftOverlay" class="craft-overlay" aria-hidden="true" hidden><div id="craftBench" class="craft-bench">
    <i class="bench-nail left"></i><i class="bench-nail right"></i><div class="bench-anvil"></div>
    <svg id="craftBag" class="craft-bag" viewBox="0 0 70 64"><path d="M24 18 18 4l17 5L52 4l-6 14c5 10 17 15 17 29 0 12-13 15-28 15S7 59 7 47c0-14 12-19 17-29Z" fill="#876044" stroke="#d9aa70" stroke-width="2"/><path d="M21 19q15 5 28 0m-23 2-8 21m24-20 6 19" fill="none" stroke="#4a352b" stroke-width="3"/></svg>
    <svg id="craftHammer" class="craft-hammer" viewBox="0 0 82 142"><path d="M34 39h14v96q-7 8-14 0Z" fill="#795035" stroke="#bd986c" stroke-width="2"/><path d="M30 109h22v26q-11 9-22 0Z" fill="#35251b"/><path d="M5 13 14 5h57l6 8v27l-6 7H14L5 40Z" fill="#625e59" stroke="#beb2a1" stroke-width="2"/><path d="M12 14h58M14 37h54M23 6v41M59 6v41" fill="none" stroke="#363231" stroke-width="3"/></svg>
    <div id="craftImpact" class="craft-impact"></div><div id="craftParticles" class="craft-particles"></div><div id="craftItem" class="craft-item" hidden></div>
-  </div>
-  <p id="craftResult" class="craft-result" role="status">Выбери рецепт под верстаком.</p>
+  </div></div>
+  <p class="craft-hint">Можно создать сразу или указать количество выполнений.</p>
   <div class="craft-switch" role="group" aria-label="Разделы крафта">
    <button type="button" id="craftSpinTab" aria-pressed="true" aria-controls="craftSpinList">Крутки</button>
    <button type="button" id="craftBoostTab" aria-pressed="false" aria-controls="craftBoostList">Усилители</button>

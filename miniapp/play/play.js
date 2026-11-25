@@ -107,7 +107,7 @@ const craftIcons={
  shuffle:['M16 2 20 5l5 1 1 5 4 5-4 4-1 5-5 1-4 4-4-4-5-1-1-5-4-4 4-5 1-5 5-1Z','M8 15a8 8 0 0 1 13-5l2 2m0-5v5h-5m6 5a8 8 0 0 1-13 5l-2-2m0 5v-5h5m2-7v6m-3-3h6'],
  arena:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M13 21l8-11-4 1-6 8m-1-2 5 4m-3-2-2 3']
 };
-const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','+1 к мастерству · 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене']};
+const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','Повышает мастерство на 1 уровень на следующие 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене']};
 const materialNames={C:['обычная','обычные','обычных'],R:['редкая','редкие','редких'],E:['эпическая','эпические','эпических'],L:['легендарная','легендарные','легендарных'],M:['мифическая','мифические','мифических']};
 function craftIcon(kind){
  const icon=document.createElementNS(svgNS,'svg');
@@ -126,29 +126,26 @@ function craftCost(recipe,n=1){
  return adjectives?`${cost} ${plural(cost,...adjectives)} ${plural(cost,'повторка','повторки','повторок')}`:`${cost} пыли`;
 }
 const recipeRows=[], inventoryRows=[];
-let craftLimit=1, selectedRecipe=null;
+let craftLimit=1;
 function buildCraft(){
  for(const [key,recipe] of Object.entries(craftRecipes)){
   const id=Number(key), {boost}=recipe, row=node('div',undefined,'craft-row craft-recipe');
-  const copy=node('span'), title=node('strong',craftTitle(recipe)), amount=node('small');
-  copy.append(title,amount);
-  const pick=node('button',undefined,'craft-pick');pick.type='button';
-  pick.setAttribute('aria-expanded','false');pick.setAttribute('aria-controls',`craft-order-${id}`);
-  pick.append(craftIcon(boost||'spins'),copy,node('span','⌄','craft-chevron'));
-  const order=node('div',undefined,'craft-order');order.id=`craft-order-${id}`;order.hidden=true;
-  const totals=node('p',undefined,'craft-totals'), stepper=node('div',undefined,'craft-stepper');
+  const copy=node('div'), title=node('strong',craftTitle(recipe)), amount=node('small');
+  copy.append(title,amount);if(boost)copy.append(node('small',boostInfo[boost][1]));
+  const controls=node('div',undefined,'craft-quantity');
+  const count=node('input'), max=node('button','Макс.');
+  count.type='text';count.inputMode='numeric';count.maxLength=2;count.value='1';
+  count.setAttribute('aria-label',`Количество выполнений: ${title.textContent}`);
+  max.type='button';max.setAttribute('aria-label',`Максимальное количество: ${title.textContent}`);
+  const button=node('button','Создать','primary craft-submit');button.type='button';
+  button.setAttribute('aria-label',`Создать: ${title.textContent}`);
   const receipt=node('small',undefined,'craft-receipt');receipt.setAttribute('role','status');
-  const minus=node('button','−'), count=node('output','1'), plus=node('button','+'), max=node('button','Макс.');
-  minus.setAttribute('aria-label','Уменьшить количество');plus.setAttribute('aria-label','Увеличить количество');
-  max.setAttribute('aria-label','Выбрать максимально доступное количество');count.setAttribute('aria-label','Количество выполнений рецепта');
-  const button=node('button','Создать','primary craft-submit');
-  for(const b of [minus,plus,max,button])b.type='button';
-  const entry={recipe,id,pick,order,amount,totals,minus,count,plus,max,button,receipt,n:1,limit:0};
-  pick.onclick=()=>{selectedRecipe=selectedRecipe===entry?null:entry;refreshCraft(busy||!!pending);};
-  minus.onclick=()=>{entry.n--;refreshCraft(busy||!!pending);};plus.onclick=()=>{entry.n++;refreshCraft(busy||!!pending);};
-  max.onclick=()=>{entry.n=entry.limit;refreshCraft(busy||!!pending);};
-  button.onclick=()=>transact('craft',id,entry.n);
-  stepper.append(minus,count,plus,max);order.append(totals,stepper,button,receipt);row.append(pick,order);
+  const entry={recipe,id,amount,title,count,max,button,receipt,limit:0};
+  count.oninput=()=>updateRecipe(entry,busy||!!pending);
+  count.onkeydown=e=>{if(e.key==='Enter'&&!button.disabled){e.preventDefault();button.click();}};
+  max.onclick=()=>{count.value=entry.limit;updateRecipe(entry,busy||!!pending);};
+  button.onclick=()=>{const n=Number(count.value);count.blur();transact('craft',id,n);};
+  controls.append(count,max);row.append(craftIcon(boost||'spins'),copy,button,controls,receipt);
   $(boost?'craftBoostList':'craftSpinList').append(row);recipeRows.push(entry);
   if(boost){
    const item=node('div',undefined,'craft-row'), info=node('div'), status=node('small');
@@ -158,23 +155,25 @@ function buildCraft(){
   }
  }
 }
+function updateRecipe({recipe,amount,title,count,max,button,limit,have},blocked){
+ const n=Number(count.value), valid=/^\d{1,2}$/.test(count.value)&&n>=1&&n<=limit;
+ title.textContent=craftTitle(recipe,valid?n:1);
+ amount.textContent=limit?(valid?`${craftCost(recipe,n)} · в наличии: ${have}`:`Введите от 1 до ${limit}`):`${craftCost(recipe)} · в наличии: ${have}`;
+ count.setAttribute('aria-invalid',String(!!limit&&!valid));
+ count.disabled=blocked||!limit;max.disabled=blocked||limit<2||(valid&&n===limit);
+ button.disabled=blocked||!valid;
+}
 function refreshCraft(blocked){
  if(craftRecipes&&!recipeRows.length)buildCraft();
  const stock={dust:state.dust};
  for(const [id,n] of Object.entries(state.owned))if(cards.has(id))stock[id[4]]=(stock[id[4]]||0)+Math.max(0,n-1);
  const active=state.activeBoosts||{}, inventory=state.boostInventory||{};
  for(const entry of recipeRows){
-  const {recipe,pick,order,amount,totals,minus,count,plus,max,button}=entry;
-  const have=stock[recipe.material]||0, open=selectedRecipe===entry;
-  entry.limit=Math.min(craftLimit,Math.floor(have/recipe.cost));
-  const n=entry.n=Math.max(1,Math.min(entry.limit,entry.n));
-  pick.setAttribute('aria-expanded',String(open));order.hidden=!open;
-  amount.textContent=`${craftCost(recipe)} · в наличии: ${have}`;
-  totals.textContent=entry.limit?`Расход: ${craftCost(recipe,n)} · Результат: ${craftTitle(recipe,n)}`:`Не хватает материалов: ${craftCost(recipe)} · в наличии: ${have}`;
-  if(recipe.boost)totals.textContent+=` · ${boostInfo[recipe.boost][1]}`;
-  count.textContent=n;
-  minus.disabled=blocked||n<=1;plus.disabled=blocked||n>=entry.limit;max.disabled=plus.disabled;
-  button.disabled=blocked||!entry.limit;
+  entry.have=stock[entry.recipe.material]||0;
+  const limit=Math.min(craftLimit,Math.floor(entry.have/entry.recipe.cost));
+  if(limit!==entry.limit && Number(entry.count.value)>limit)entry.count.value=Math.max(1,limit);
+  entry.limit=limit;
+  updateRecipe(entry,blocked);
  }
  for(const {boost,status,button} of inventoryRows){
   const n=inventory[boost]||0, left=active[boost]||0;
@@ -242,16 +241,16 @@ function showShuffleReward(out){
 function refresh(){
  if(!state)return;
  const left=state.freeSpins, spins=state.spins??0, rewardSpins=state.rewardSpins??0, blocked=busy||!!pending;
- $('coins').textContent=state.coins;$('dust').textContent=state.dust;
+ const total=left+spins+rewardSpins;
+ $('totalSpins').textContent=total;$('coins').textContent=state.coins;$('dust').textContent=state.dust;
  const freeMinutes=Math.ceil(Math.max(0,state.freeNextAt-clock())/60);
- $('free').textContent=`Бесплатно: ${left} из 5`;
+ $('free').textContent=`Бесплатные: ${left} из 5`;
  $('freeTimer').textContent=left===5?'Запас полный · +1 каждые 3 часа':freeMinutes?`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`:'Обновляем крутки…';
- $('rewardSpins').hidden=!rewardSpins;$('rewardSpins').textContent=`Наградные крутки: ${rewardSpins}`;
  $('testSpins').textContent=`Тестовые крутки: ${spins}`;
  if(testPanel)testPanel.hidden=!canGrantSpins;
  for(const b of grants)b.disabled=blocked||!canGrantSpins;
- for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-left-spins-rewardSpins),missing=cost-state.coins;
-  b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Бесплатно'));b.disabled=blocked||missing>0;
+ for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-total),missing=cost-state.coins;
+  b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:'Из запаса'));b.disabled=blocked||missing>0;
  }
  const counts=Object.entries(state.owned);
  $('clearCollection').disabled=blocked||!canGrantSpins||!counts.length;
@@ -366,7 +365,7 @@ async function shuffleDeck(){
  const radius=Math.min(158,scene.clientWidth*.35), orbitEnd=4420*.74;
  const fanEnd=orbitEnd+340, firstRelease=fanEnd+145, spacing=128, travel=240;
  const width=Math.min(235,scene.clientWidth-106), impact=firstRelease+7*spacing+travel;
- const animations=[], epoch=document.timeline.currentTime;
+ const animations=[], timers=[], epoch=document.timeline.currentTime;
  const animate=(el,frames,options)=>{
   const animation=el.animate(frames,options);animations.push(animation);
   if(epoch!=null)animation.startTime=epoch;
@@ -375,7 +374,9 @@ async function shuffleDeck(){
  };
  const angle=(i,t)=>2*Math.PI*(i/8+t*1.08);
  const order=Array.from({length:8},(_,i)=>i).sort((a,b)=>Math.cos(angle(a,1))-Math.cos(angle(b,1)));
- stopScene=()=>animations.forEach(a=>a.cancel());
+ stopScene=()=>{animations.forEach(a=>a.cancel());timers.forEach(clearTimeout);};
+ for(const ms of [110,710,1300,1950,2600,...Array.from({length:8},(_,i)=>firstRelease+i*spacing+travel*.6)])
+  timers.push(setTimeout(()=>DrawSound.cue('paper'),ms));
  try{
   const flights=Array.from({length:8},(_,i)=>{
    const card=node('i',undefined,'shuffle-flying');air.append(card);
@@ -421,6 +422,7 @@ async function shuffleDeck(){
  }finally{
   scene.dataset.phase='aligned';stopScene=null;
   for(const a of animations)a.cancel();
+  timers.forEach(clearTimeout);
   air.replaceChildren();
  }
 }
@@ -428,25 +430,20 @@ async function shuffleDeck(){
 async function craftAtBench(id,quantity){
  const recipe=craftRecipes[id], title=craftTitle(recipe,quantity);
  const onBench=()=>targetPane()==='tool-craft'&&!$('tool-craft').hidden;
- const table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), air=$('craftParticles'), item=$('craftItem');
+ const overlay=$('craftOverlay'), table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), air=$('craftParticles'), item=$('craftItem');
  const receipt=recipeRows.find(row=>row.id===id)?.receipt;
- const showItem=()=>{
-  item.dataset.kind=recipe.boost||'spins';
-  item.replaceChildren(craftIcon(item.dataset.kind),node('small','СОЗДАНО'),node('b',title));item.hidden=false;
-  $('craftResult').textContent=`Готово: ${title}`;
-  if(receipt)receipt.textContent=`Последняя партия: ${title}`;
- };
- if(!onBench()){showItem();say(`Создано: ${title}`);return;}
- say('');item.hidden=true;
- const bounds=table.getBoundingClientRect();
- // Keep the recipe in place; don't hold up a repeat craft for an offscreen scene.
- if(motion.matches||!table.animate||bounds.top+bounds.height*.5<0||bounds.top+bounds.height*.5>innerHeight){showItem();return;}
- const jobs=[], epoch=document.timeline.currentTime, duration=1660, strikes=[720,1020,1330];
+ const confirm=()=>{if(receipt)receipt.textContent=`Создано: ${title}`;};
+ if(!onBench()){confirm();say(`Создано: ${title}`);return;}
+ say('');
+ if(motion.matches||!table.animate){confirm();DrawSound.cue('forge-ready');return;}
+ item.hidden=true;overlay.hidden=false;
+ const jobs=[], timers=[], epoch=document.timeline.currentTime, duration=1660, strikes=[720,1020,1330];
  const animate=(el,frames,options)=>{
   const a=el.animate(frames,options);jobs.push(a);if(epoch!=null)a.startTime=epoch;a.finished.catch(()=>{});return a;
  };
- stopScene=()=>jobs.forEach(a=>a.cancel());
- $('craftResult').textContent=`На верстаке: ${title}…`;
+ const cleanup=()=>{jobs.forEach(a=>a.cancel());timers.forEach(clearTimeout);air.replaceChildren();};
+ stopScene=cleanup;
+ for(const [i,ms] of strikes.entries())timers.push(setTimeout(()=>DrawSound.cue('hammer',i),ms));
  try{
   const dust=recipe.material==='dust';
   if(dust)animate(bag,[{opacity:0,transform:'translate(-32px,-24px) rotate(-25deg)'},{offset:.27,opacity:1,transform:'translate(0,0) rotate(0)'},{offset:.48,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{offset:.76,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{opacity:0,transform:'translate(-22px,-18px) rotate(74deg)'}],{duration:740,fill:'both'});
@@ -481,9 +478,17 @@ async function craftAtBench(id,quantity){
   }
   await finish.finished;
  }catch{}finally{
-  jobs.forEach(a=>a.cancel());air.replaceChildren();stopScene=null;
-  showItem();
-  if(!onBench())say(`Создано: ${title}`);
+  cleanup();confirm();
+  if(onBench()){
+   item.dataset.kind=recipe.boost||'spins';
+   item.replaceChildren(craftIcon(item.dataset.kind),node('small','СОЗДАНО'),node('b',title));item.hidden=false;
+   DrawSound.cue('forge-ready');
+   await new Promise(resolve=>{
+    const hold=setTimeout(resolve,680);
+    stopScene=()=>{clearTimeout(hold);resolve();};
+   });
+  }else say(`Создано: ${title}`);
+  overlay.hidden=true;stopScene=null;
  }
 }
 
@@ -505,6 +510,7 @@ async function transact(kind,size,quantity=1){
  busy=true;refresh();
  const op=pending;
  if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
+ if(op.kind==='break'||op.kind==='craft')DrawSound.unlock();
  if(op.kind==='break'){hideShuffleReveal();$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('Сохраняем результат…');
  let conflict=false;
@@ -527,6 +533,7 @@ async function transact(kind,size,quantity=1){
   }
   else {
    try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
+   if(targetPane()==='tool-shuffle')DrawSound.cue('shuffle-ready',!!out.bonus);
    showShuffleReward(out);
   }
  }catch(e){
@@ -537,7 +544,7 @@ async function transact(kind,size,quantity=1){
  if(conflict)sync();
 }
 function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
-$('sound').onclick=()=>{DrawSound.toggle();sound();};sound();
+$('sound').onclick=()=>{DrawSound.toggle();if(DrawSound.enabled)DrawSound.unlock();sound();};sound();
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 for(const b of grants)b.onclick=()=>{if(canGrantSpins)transact('grant',Number(b.dataset.grant));};
 $('clearCollection').onclick=()=>{clearConfirm.returnValue='';clearConfirm.showModal();tg?.BackButton?.show();};

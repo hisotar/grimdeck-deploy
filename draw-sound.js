@@ -55,7 +55,7 @@ window.DrawSound = (() => {
    }
   } catch { /* Audio must never interrupt a draw. */ }
  }
- async function play(immediateRarity){
+ async function unlock(){
   if(!enabled)return;
   try {
    const Context=window.AudioContext||window.webkitAudioContext;
@@ -67,11 +67,33 @@ window.DrawSound = (() => {
     for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
    }
    if(audio.state!=='running')await audio.resume();
-   if(!enabled)return;
-   const at=audio.currentTime;
+   return enabled&&audio.state==='running';
+  } catch { return false; }
+ }
+ async function play(immediateRarity){
+  if(!await unlock())return;
+  try {
    if(immediateRarity)reveal(immediateRarity);
-   else noise(at,.31,.29,750,3700,.22,5,.32);
+   else noise(audio.currentTime,.31,.29,750,3700,.22,5,.32);
   } catch { /* Audio must never interrupt a draw. */ }
  }
- return {play,reveal,toggle,get enabled(){return enabled;}};
+ function cue(name,variant=0){
+  if(!enabled||audio?.state!=='running'||document.hidden)return;
+  try {
+   const at=audio.currentTime;
+   if(name==='hammer'){
+    noise(at,.062,.36,185,1900,.03,9);
+    noise(at+.002,.031,.21,2400,6600,.035,9);
+    tone(at,510+55*variant,.116,.09,'triangle',420);
+   }else if(name==='forge-ready'){
+    tone(at,523.25,.22,.10,'triangle');tone(at+.056,783.99,.27,.08);
+   }else if(name==='paper'){
+    noise(at,.14,.23,570,4900,.16,6,.42);
+   }else if(name==='shuffle-ready'){
+    noise(at,.068,.38,240,2800,.04,8);
+    tone(at+.022,variant?523.25:330,.20,.09,'triangle');
+   }
+  } catch { /* Audio is optional. */ }
+ }
+ return {play,reveal,unlock,cue,toggle,get enabled(){return enabled;}};
 })();
