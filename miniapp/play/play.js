@@ -525,9 +525,14 @@ async function craftAtBench(id,quantity){
  for(const [i,ms] of strikes.entries())timers.push(setTimeout(()=>DrawSound.cue('hammer',i),ms));
  try{
   const dust=recipe.material==='dust';
-  if(dust)animate(bag,[{opacity:0,transform:'translate(-32px,-24px) rotate(-25deg)'},{offset:.27,opacity:1,transform:'translate(0,0) rotate(0)'},{offset:.48,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{offset:.76,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{opacity:0,transform:'translate(-22px,-18px) rotate(74deg)'}],{duration:740,fill:'both'});
   const at=(ms,frame)=>({...frame,offset:ms/duration});
-  const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(28px,-3px) rotate(-96deg)';
+  if(dust){
+   const bagFrames=[at(0,{opacity:0,transform:'translate(-24px,-45px) rotate(-16deg)'}),at(395,{opacity:1,transform:'translateY(0)'}),at(470,{opacity:1,transform:'scale(1.05,.93)'}),at(540,{opacity:1,transform:'none'})];
+   for(const ms of strikes)bagFrames.push(at(ms,{opacity:1,transform:'none'}),at(ms+46,{opacity:1,transform:'scale(1.11,.77)'}),at(ms+115,{opacity:1,transform:'none'}));
+   bagFrames.push(at(duration,{opacity:0,transform:'scale(.9,.86)'}));
+   animate(bag,bagFrames,{duration,fill:'both'});
+  }
+  const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(34px,-4px) rotate(-96deg)';
   const motionFrames=[at(0,{transform:rest})];
   for(const ms of strikes)motionFrames.push(at(ms-205,{transform:raised,easing:'cubic-bezier(.72,0,.9,.42)'}),at(ms,{transform:hit,easing:'ease-out'}),at(ms+105,{transform:raised}));
   motionFrames.push(at(duration,{transform:rest}));
@@ -541,12 +546,12 @@ async function craftAtBench(id,quantity){
    animate(table,[{transform:'translateY(0)'},{offset:.12,transform:'translateY(2px)'},{offset:.32,transform:'translateY(-1px)'},{transform:'translateY(0)'}],{duration:145,delay:ms});
   }
   const spread=Math.min(102,table.clientWidth*.31);
-  for(let i=0;i<(dust?26:14);i++){
-   const bit=node('i',undefined,dust?'bench-dust':'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
+  for(let i=0;!dust&&i<14;i++){
+   const bit=node('i',undefined,'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
    const theta=i*2.4, x=Math.cos(theta)*spread*(.36+(i%8)*.09), y=Math.sin(theta)*(12+i%6*4)+13;
    const pose=(x,y,turn,scale=1)=>`translate(${x}px,${y}px) rotate(${turn}deg) scale(${scale})`;
-   const start=(dust?195:90)+i*8;
-   const frames=[at(0,{opacity:0}),at(start,{opacity:0,transform:pose(dust?-spread*.68:0,-73,i*33)}),at(start+45,{opacity:1}),at(start+230,{opacity:1,transform:pose(x,y,i*72)})];
+   const start=90+i*8;
+   const frames=[at(0,{opacity:0}),at(start,{opacity:0,transform:pose(0,-73,i*33)}),at(start+45,{opacity:1}),at(start+230,{opacity:1,transform:pose(x,y,i*72)})];
    for(const [idx,ms] of strikes.entries()){
     const f=1-idx/3, next=f-1/3;
     frames.push(at(ms,{transform:pose(x*f,y*f,i*72),opacity:1}),at(ms+55,{transform:pose(x*(f+next)/2,y*f-10,i*72+19),opacity:1}),at(ms+150,{transform:pose(x*next,y*next,i*72,idx===2?.2:1),opacity:idx===2?0:1}));

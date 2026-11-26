@@ -7,55 +7,48 @@
 .album-category{margin:18px 0}.album-category-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid var(--line);font-size:1rem}.album-category-count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 :root{-webkit-tap-highlight-color:transparent}
 
-/* Each rarity has its own silhouette and timing. All light stays behind the card. */
-.draw-stage[data-r]{--light:var(--tone,#e2ded4)}
-.draw-stage[data-r]::before,.draw-stage[data-r]::after{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;opacity:0;pointer-events:none}
+/* Soft light follows the flip; a second layer gives each rarity its own accent. */
+.draw-stage[data-r]{--light:var(--tone,#e2ded4);--glow-rest:.21;--glow-peak:.55}
+.draw-stage[data-r]::before,.draw-stage[data-r]::after{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;pointer-events:none}
 .draw-stage[data-r]::before{
- background:radial-gradient(ellipse 48% 52% at center,var(--light),transparent 93%);
- opacity:var(--halo,.23);
+ background:radial-gradient(ellipse calc(var(--card-width) * .63) calc(var(--card-height) * .54) at 47% 47%,#fff3de,var(--light) 58%,transparent),radial-gradient(ellipse 50% 55% at 54% 55%,var(--light),transparent);
+ opacity:var(--glow-rest);animation:rarity-glow 1.4s ease-out;
 }
+.draw-stage[data-r]::after{opacity:0}
 .draw-stage[data-r=C]::after{
- background:radial-gradient(ellipse 15px 45% at center,#fff,var(--light) 34%,transparent),radial-gradient(ellipse 35% 38% at center,#bbb4a270,transparent);
- animation:reveal-edge .38s ease-out;
+ background:radial-gradient(ellipse 22% 37% at center,#fff9,var(--light) 45%,transparent);
+ animation:reveal-edge .46s ease-out;
 }
-.draw-stage[data-r=R]{--halo:.29}
+.draw-stage[data-r=R]{--glow-rest:.25;--glow-peak:.63}
 .draw-stage[data-r=R]::after{
- background:conic-gradient(from 104deg,transparent 0 190deg,#669ca580 220deg,var(--light) 282deg,#eeffff 302deg,transparent 310deg);
- -webkit-mask-image:radial-gradient(ellipse at center,transparent 53%,#000 55% 59%,transparent 61%);
- mask-image:radial-gradient(ellipse at center,transparent 53%,#000 55% 59%,transparent 61%);
- animation:reveal-arc .83s cubic-bezier(.17,.65,.23,1);
+ background:conic-gradient(from 210deg,transparent 0 184deg,var(--light) 215deg,#eeffff 254deg,transparent 289deg);
+ -webkit-mask-image:radial-gradient(ellipse at center,transparent 54%,#000 57%,transparent 61%);
+ mask-image:radial-gradient(ellipse at center,transparent 54%,#000 57%,transparent 61%);
+ animation:reveal-arc .82s ease-out;
 }
-.draw-stage[data-r=E]{--halo:.34}
+.draw-stage[data-r=E]{--glow-rest:.29;--glow-peak:.72}
 .draw-stage[data-r=E]::after{
- background:radial-gradient(circle 4px at 13% 31%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 84% 22%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 91% 65%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 21% 82%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 71% 87%,var(--light),transparent),radial-gradient(ellipse at center,transparent 45%,var(--light) 47%,#fff 48%,transparent 50% 56%,var(--light) 57%,transparent 58%);
- animation:reveal-ring 1.02s cubic-bezier(.11,.71,.26,1);
+ background:radial-gradient(circle 3px at 18% 33%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 81% 25%,#fff,var(--light) 36%,transparent),radial-gradient(circle 3px at 85% 66%,#fff,var(--light) 36%,transparent),radial-gradient(circle 2px at 22% 78%,#fff,var(--light) 36%,transparent),radial-gradient(ellipse at center,transparent 49%,var(--light) 52%,transparent 56%);
+ animation:reveal-ring .98s ease-out;
 }
-.draw-stage[data-r=L]{--halo:.39}
-.draw-stage[data-r=L]::before{animation:reveal-ignition 1.35s ease-out}
+.draw-stage[data-r=L]{--glow-rest:.33;--glow-peak:.82}
 .draw-stage[data-r=L]::after{
- background:conic-gradient(from 5deg,transparent 0 14deg,var(--light) 19deg,#fff2cb 22deg,transparent 27deg 64deg,var(--light) 70deg,transparent 75deg 118deg,#fff0be 127deg,transparent 134deg 165deg,var(--light) 175deg,transparent 181deg 215deg,#fff2cb 227deg,transparent 234deg 268deg,var(--light) 277deg,transparent 284deg 320deg,#fff2cb 329deg,transparent 339deg);
- -webkit-mask-image:radial-gradient(ellipse at center,#000 33%,transparent 76%);
- mask-image:radial-gradient(ellipse at center,#000 33%,transparent 76%);
- animation:reveal-rays 1.25s ease-out;
+ background:conic-gradient(from 5deg,transparent 0 14deg,var(--light) 20deg,transparent 27deg 64deg,var(--light) 70deg,transparent 76deg 118deg,#fff0be 125deg,transparent 133deg 166deg,var(--light) 173deg,transparent 181deg 218deg,#fff2cb 227deg,transparent 236deg 268deg,var(--light) 277deg,transparent 286deg 321deg,#fff2cb 329deg,transparent 340deg);
+ -webkit-mask-image:radial-gradient(ellipse at center,#000 29%,transparent 70%);
+ mask-image:radial-gradient(ellipse at center,#000 29%,transparent 70%);
+ animation:reveal-rays 1.17s ease-out;
 }
-.draw-stage[data-r=M]{--halo:.44}
-.draw-stage[data-r=M]::before{
- background:radial-gradient(ellipse 57% 59% at center,#080509 36%,var(--light) 52%,#872c4055 72%,transparent 93%);
- animation:reveal-eclipse 1.42s ease-out;
-}
+.draw-stage[data-r=M]{--glow-rest:.37;--glow-peak:.93}
 .draw-stage[data-r=M]::after{
- background:radial-gradient(circle 4px at 13% 22%,#fff,var(--light) 43%,transparent),radial-gradient(circle 4px at 85% 31%,#fff,var(--light) 43%,transparent),radial-gradient(circle 3px at 12% 77%,#fff,var(--light) 43%,transparent),radial-gradient(circle 3px at 81% 81%,#fff,var(--light) 43%,transparent),radial-gradient(ellipse at center,transparent 47%,#ffeae4 49%,var(--light) 50%,transparent 54%),repeating-conic-gradient(from 7deg,transparent 0 23deg,var(--light) 27deg,transparent 31deg 40deg);
- -webkit-mask-image:radial-gradient(ellipse at center,transparent 32%,#000 49% 62%,transparent 75%);
- mask-image:radial-gradient(ellipse at center,transparent 32%,#000 49% 62%,transparent 75%);
- animation:reveal-crown 1.26s .15s ease-out;
+ background:radial-gradient(circle 4px at 16% 25%,#fff,var(--light) 43%,transparent),radial-gradient(circle 4px at 84% 28%,#fff,var(--light) 43%,transparent),radial-gradient(circle 3px at 15% 73%,#fff,var(--light) 43%,transparent),radial-gradient(circle 3px at 82% 77%,#fff,var(--light) 43%,transparent),radial-gradient(ellipse at center,transparent 47%,#ffeae4 49%,var(--light) 51%,transparent 55%),radial-gradient(ellipse at center,transparent 57%,var(--light) 59%,transparent 63%);
+ animation:reveal-crown 1.24s .08s ease-out;
 }
-@keyframes reveal-edge{0%{opacity:.98;transform:scaleX(.45)}100%{opacity:0;transform:scaleX(1.35)}}
-@keyframes reveal-arc{0%{opacity:.86;transform:rotate(-65deg) scale(.84)}60%{opacity:.94}100%{opacity:0;transform:rotate(31deg) scale(1.14)}}
-@keyframes reveal-ring{0%{opacity:0;transform:scale(.53)}17%{opacity:.96}100%{opacity:0;transform:scale(1.35)}}
-@keyframes reveal-ignition{0%{opacity:.88;transform:scale(.8)}100%{transform:none}}
-@keyframes reveal-rays{0%{opacity:.97;transform:scale(.75)}35%{opacity:.86}100%{opacity:0;transform:rotate(9deg) scale(1.16)}}
-@keyframes reveal-eclipse{0%,15%{opacity:1;transform:scale(.79)}27%{opacity:.95;transform:scale(1.08)}100%{transform:none}}
-@keyframes reveal-crown{0%{opacity:0;transform:scale(.72)}14%{opacity:1;transform:scale(1.04)}100%{opacity:0;transform:scale(1.29)}}
+@keyframes rarity-glow{0%{opacity:0;transform:scale(.86)}18%{opacity:var(--glow-peak);transform:scale(1.02)}100%{transform:none}}
+@keyframes reveal-edge{0%{opacity:0;transform:scaleX(.62)}22%{opacity:.66}100%{opacity:0;transform:scaleX(1.58)}}
+@keyframes reveal-arc{0%{opacity:0;transform:rotate(-20deg) scale(.93)}24%{opacity:.67}100%{opacity:0;transform:rotate(12deg) scale(1.1)}}
+@keyframes reveal-ring{0%{opacity:0;transform:scale(.78)}23%{opacity:.72}100%{opacity:0;transform:scale(1.2)}}
+@keyframes reveal-rays{0%{opacity:0;transform:scale(.81)}22%{opacity:.78}100%{opacity:0;transform:scale(1.14)}}
+@keyframes reveal-crown{0%{opacity:0;transform:scale(.82)}20%{opacity:.85}100%{opacity:0;transform:scale(1.18)}}
 @media(prefers-reduced-motion:reduce){.draw-stage[data-r]::before{animation:none}.draw-stage[data-r]::after{display:none;animation:none}}
 
 /* The shared frame supplies the ornament; the old rarity edge remains. */
@@ -181,14 +174,10 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
  background:radial-gradient(ellipse at 48% 37%,#de995538,transparent 70%),repeating-linear-gradient(2deg,transparent 0 3px,#24130c30 4px 5px,transparent 6px 11px),repeating-linear-gradient(0deg,#54321f 0 2px,#281a14 3px 5px,#6e452c 6px 9px,#4e301f 53px,#362219 56px);
  box-shadow:inset 0 0 24px 4px #21150f,0 5px 0 #100e0c,0 10px 18px #1119;
 }
-.bench-nail{position:absolute;top:10px;width:10px;height:10px;border-radius:50%;background:linear-gradient(25deg,#422e1e 35%,#a28e76 47%,#716350 61%);box-shadow:0 1px 3px #200}
-.bench-nail.left{left:10px}.bench-nail.right{right:10px}
-.bench-anvil{position:absolute;inset:50% auto auto 50%;width:clamp(110px,43%,168px);height:78px;transform:translate(-50%,-45%);border:2px solid #6f6254;border-radius:21% 21% 19% 19%;background:linear-gradient(147deg,#4b433b,#312b27 48%,#241e1a);box-shadow:inset 0 0 0 4px #3b322a,0 7px 0 #231813,0 9px 15px #23140c;}
 .craft-hammer,.craft-bag,.craft-particles,.craft-item{position:absolute;top:50%;left:50%}
 .craft-hammer{z-index:2;width:60px;height:104px;margin:-52px 0 0 -30px;transform:translate(66px,15px) rotate(-49deg);filter:drop-shadow(3px 5px 3px #22160d)}
-.craft-bag{z-index:2;width:55px;height:51px;margin:-82px 0 0 clamp(-111px,-29vw,-75px);opacity:0;filter:drop-shadow(2px 3px 3px #22160d)}
+.craft-bag{z-index:2;width:55px;height:51px;margin:-3px 0 0 -27.5px;transform-origin:50% 88%;opacity:0;filter:drop-shadow(2px 3px 3px #22160d)}
 .craft-particles{z-index:1}.craft-particles i{position:absolute;display:block;opacity:0}
-.bench-dust{width:7px;height:6px;background:#e8bc76;border:1px solid #ffdc93;border-radius:36%;box-shadow:0 0 4px #ffd67577}
 .bench-scrap{width:13px;height:16px;clip-path:polygon(0 0,100% 14%,78% 41%,100% 96%,12% 100%,25% 76%,0 63%);background:repeating-linear-gradient(118deg,var(--tone,#d6ba88) 0 3px,#655344 4px 5px);border:1px solid #4b3930}
 .bench-spark{width:13px;height:3px;border-radius:50%;background:#ffc66d;box-shadow:0 0 8px #ff923f;transform-origin:left center}
 .craft-item{z-index:3;display:grid;justify-items:center;gap:4px;min-width:112px;padding:9px 10px;transform:translate(-50%,-53%);border:1px solid #94734d;border-radius:9px;background:#211a15f5;color:#ffe5b0;box-shadow:0 0 28px #ffc97163;animation:craft-item-in .26s ease-out}
@@ -289,7 +278,6 @@ nav a:active{transform:translateY(2px);box-shadow:inset 0 1px 4px #140c07,0 1px 
  --bevel:linear-gradient(#292a28,#1e1f1e 48%,#171817 50%,#1c1d1c);
  --recess:inset 0 1px #e2d6c016,inset 0 0 0 3px #0c101675,0 4px 12px #090c1080;
  --stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='384' height='292' viewBox='0 0 384 292'%3E%3Cpath d='M0 1h384M0 96h384M0 194h384M125 0v96m176 0V0M65 96v98m175-98v98m96-98v98M160 194v98m139-98v98M38 0l12 23-8 16 17 16 4 24 23 17m-27-41 18-4 18 10 8 20M261 96l-13 19 12 15-8 24 17 13-5 27m-12-40-17 10-20-3M106 194l12 17-6 20 15 13 7 25 24 23m-31-48-21 5-10 13-19 2M342 0l-11 18 9 17-6 19 12 21-9 21' fill='none' stroke='%23040505' stroke-width='3' stroke-opacity='.8'/%3E%3Cpath d='M0 3h384M0 98h384M0 196h384M127 3v93m176 0V3M67 98v96m175-96v96m96-96v96M162 196v96m139-96v96' fill='none' stroke='%23928c7e' stroke-opacity='.12'/%3E%3Cpath d='M15 41h15m147-11h33m-45 22h8m150 101h59M79 135h36m2 33h21m123 50h12m-81 35h48m-70-8h13M0 221h29m313 55h22' stroke='%2377818a' stroke-opacity='.12'/%3E%3C/svg%3E");
- --filigree:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='76' height='24' viewBox='0 0 76 24'%3E%3Cpath d='M1 12h13c5 0 8-7 13-7 3 0 5 3 3 5-2 2-5 0-5-2m-11 4c5 0 8 7 13 7 3 0 5-3 3-5-2-2-5 0-5 2m50-4H62c-5 0-8-7-13-7-3 0-5 3-3 5 2 2 5 0 5-2m11 4c-5 0-8 7-13 7-3 0-5-3-3-5 2-2 5 0 5 2M38 7l5 5-5 5-5-5Z' fill='none' stroke='%23aeb6bd' stroke-opacity='.65'/%3E%3C/svg%3E");
 }
 body{background:radial-gradient(ellipse at 50% 0,#8a796129,transparent 65%),var(--stone) top center / 384px 292px,#101111;color:var(--steel-ink)}
 :is(.deck-tools,.spin-panel,.craft-row,.shuffle-panel,.shuffle-result,.card-view-copy,.card-view-actions,dialog){border-color:var(--line);background:var(--iron);box-shadow:var(--recess)}
@@ -303,21 +291,21 @@ body{background:radial-gradient(ellipse at 50% 0,#8a796129,transparent 65%),var(
 button:not(.tile,.front,.primary,.danger),input,select,.deck-tool .deck-back,.card-view-actions button,nav a{background:var(--bevel);border-color:var(--steel-edge);color:var(--steel-ink);box-shadow:var(--recess)}
 .primary{background:linear-gradient(#443a2c,#2c261c);color:#f1dfbc;border-color:#817055;box-shadow:inset 0 0 0 2px #493d2d3d,0 3px 5px #0a0c1099}
 .deck-tools-grid button span,.craft-row button:not(.primary){color:#d5dce4}
-.deck-tools-grid button{background:var(--filigree) center bottom -3px no-repeat,var(--bevel);padding-bottom:14px}
+.deck-tools-grid button{background:var(--bevel)}
 nav{background:linear-gradient(#1a1b19fa,#101110);border-color:var(--line)}
 nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria-current]{border-color:#8c7b5c;color:#f0ddba;background:linear-gradient(#342e25,#211e19);box-shadow:inset 0 0 0 2px #252628,inset 0 0 0 3px #b3a18445,0 3px #111418}
-.deck-plaque{grid-template-columns:auto minmax(0,auto);gap:clamp(4px,2vw,12px);padding:6px 18px;border-color:#625d52;background:var(--filigree) right 5px bottom 1px no-repeat,radial-gradient(ellipse at 30% 0,#76694e26,transparent 70%),var(--iron);box-shadow:var(--recess)}
+.deck-plaque{gap:5px;padding:6px 18px;border-color:#625d52;background:radial-gradient(ellipse at 30% 0,#76694e26,transparent 70%),var(--iron);box-shadow:var(--recess)}
 .deck-plaque::before{border-color:#6f685747}
 .deck-plaque h1{color:#e6dece;text-shadow:0 2px 3px #070707}
-.deck-emblem{width:clamp(86px,26vw,110px);height:auto;aspect-ratio:1;object-fit:contain;filter:drop-shadow(0 3px 4px #000)}
+/* The PNG has wide transparent margins; overlap that empty space, not the mark. */
+.deck-emblem{--emblem-size:clamp(86px,26vw,110px);width:var(--emblem-size);margin-inline:calc(var(--emblem-size) * -.27);height:auto;aspect-ratio:1;object-fit:contain;filter:drop-shadow(0 3px 4px #000)}
 .deck-corner{width:21px;height:21px;border-color:#7e786a;background:linear-gradient(135deg,#222321,#6d685b 36%,#3e3d36 65%,#181917)}
 .deck-corner::after{background:#a79a7a;box-shadow:1px 1px 2px #141411}
-:is(.deck-tool>h1,#album>h1,#pack>h1){padding:10px 12px 15px;border:1px solid var(--line);border-radius:7px;text-align:center;background:var(--filigree) center bottom -5px no-repeat,var(--iron);box-shadow:var(--recess)}
 .album-category-title,.card-view-stats,.craft-inventory{border-color:var(--line)}
 .album-category-title{color:var(--tone,var(--steel-ink))}
 .card-view-stats div,.shuffle-loot li{background:#181d22;color:var(--muted);border-color:var(--line)}
 .card-view-stats dd{color:var(--steel-ink)}
-:is(.draw-stage,.shuffle-scene,.card-view-art){border-color:var(--line);background:radial-gradient(ellipse at 50% 48%,#5e58434d,transparent 72%),var(--stone) center / 300px auto,#101111;box-shadow:var(--recess)}
+:is(.draw-stage,.shuffle-scene,.card-view-art){border-color:#555149;border-radius:11px;background:radial-gradient(ellipse at 50% 46%,#282723,#171818 68%,#101111);box-shadow:inset 0 0 0 3px #0a0b0b,inset 0 1px 0 4px #ffffff0d,0 4px 12px #090c1080}
 .draw-stage{overflow:hidden}
 .card-portrait{background:radial-gradient(ellipse at 50% 40%,#2c2a27,#141515 77%)}
 .shuffle-reveal-copy{background:#20242bf5}
@@ -326,20 +314,13 @@ nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria
 .craft-quantity input[aria-invalid=true]{border-color:#efa38f}
 .boost-status{background:var(--iron);border-color:#837964;color:#e8d8b8}
 
-/* Wooden worktop, visible front apron and legs under a separate anvil. */
+/* Timber work surface and front edge, with the materials on the wood. */
 .craft-overlay{background:#080807db}
 .craft-overlay .craft-bench{height:min(68dvh,268px)}
 .craft-bench{--worktop:polygon(12% 0,88% 0,100% 100%,0 100%);border:0;background:none;box-shadow:none;overflow:visible}
 .bench-furniture{position:absolute;inset:0;pointer-events:none;filter:drop-shadow(0 12px 9px #000b)}
 .bench-furniture::before{content:'';position:absolute;inset:24% 0 18%;clip-path:var(--worktop);background:radial-gradient(ellipse at 50% 40%,#a06a3538,transparent 70%),repeating-linear-gradient(0deg,#0e0a07 0 2px,#a77d4d44 2px 3px,transparent 3px 22px),repeating-linear-gradient(1deg,#aa804019 0 1px,transparent 1px 5px),linear-gradient(#30251b,#513923 62%,#37281a);box-shadow:inset 0 0 20px #080605a0}
-.bench-furniture::after{content:'';position:absolute;inset:82% 0 8%;border:1px solid #705233;border-bottom:3px solid #110c08;background:var(--filigree) center no-repeat,repeating-linear-gradient(1deg,#0003 0 1px,transparent 1px 4px),linear-gradient(#3b291a,#21160e);border-radius:0 0 4px 4px}
-.bench-leg{position:absolute;bottom:0;width:14px;height:15%;border:1px solid #483421;background:linear-gradient(90deg,#18100c,#3f2c1b 48%,#20150d)}
-.bench-leg.left{left:8%;transform:skew(-5deg)}.bench-leg.right{right:8%;transform:skew(5deg)}
-.bench-tools{position:absolute;inset:26% 6% auto;width:88%;height:54%;filter:drop-shadow(1px 2px 1px #0b0805);pointer-events:none}
-.bench-nail{top:27%;width:6px;height:6px;background:linear-gradient(25deg,#343331 38%,#181715 43% 52%,#9a907e 56%,#51504a 68%);box-shadow:0 1px 3px #080705}
-.bench-nail.left{left:15%}.bench-nail.right{right:15%}
-.bench-nail.lower{top:auto;bottom:12%;z-index:1}.bench-nail.lower.left{left:6%}.bench-nail.lower.right{right:6%}
-.bench-anvil{position:absolute;inset:calc(50% - 7px) auto auto 50%;width:clamp(108px,45%,164px);height:58px;transform:translateX(-50%);border:0;border-radius:0;background:none;box-shadow:none;filter:drop-shadow(0 7px 4px #0c0806bb)}
+.bench-furniture::after{content:'';position:absolute;inset:82% 0 8%;border:1px solid #705233;border-bottom:3px solid #110c08;background:repeating-linear-gradient(1deg,#0003 0 1px,transparent 1px 4px),linear-gradient(#3b291a,#21160e);border-radius:0 0 4px 4px}
 .craft-hammer{filter:drop-shadow(3px 5px 3px #090c10)}
 .craft-impact{z-index:1;inset:calc(50% - 39px) 7% auto;height:78px;background:radial-gradient(ellipse at center,#fff7d6 1%,#ffcb87 9%,#ee8c4555 25%,transparent 64%);}
 .craft-impact::before,.craft-impact::after{content:'';position:absolute;inset:18% 12%;border-radius:50%;border:1px solid #ffcf8d;box-shadow:0 0 13px #f7804670,inset 0 0 10px #f7a25b70}
