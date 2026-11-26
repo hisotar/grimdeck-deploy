@@ -8,7 +8,7 @@
 </header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
  <div class="deck-plaque">
   <i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i>
-  <svg class="deck-emblem" viewBox="0 0 40 32" aria-hidden="true"><path d="M20 30 5 16 3 3l10 6 7-4 7 4 10-6-2 13-15 14ZM5 16l8-7 7 12 7-12 8 7M11 16l5 2m8 0 5-2m-11 6 2 3 2-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+  <img class="deck-emblem" src="/art/witcher-icon.png" width="72" height="72" alt="">
   <h1>Ведьмак</h1>
  </div><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="face" class="front" hidden></button></div><div class="new-card-slot" aria-live="polite"><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
 <div class="spin-panel" aria-label="Пополнение бесплатных круток"><b id="free">Бесплатные: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small></div>
@@ -52,9 +52,25 @@
  <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Крафт</h1>
   <div id="craftOverlay" class="craft-overlay" aria-hidden="true" hidden><div id="craftBench" class="craft-bench">
-   <i class="bench-nail left"></i><i class="bench-nail right"></i><div class="bench-anvil"></div>
+   <i class="bench-nail left"></i><i class="bench-nail right"></i><i class="bench-nail lower left"></i><i class="bench-nail lower right"></i>
+   <div class="bench-anvil"></div>
+   <svg class="bench-tools" viewBox="0 0 300 170" aria-hidden="true">
+    <g fill="none" stroke="#9ba0a4" stroke-width="2.5" stroke-linecap="round"><path d="M34 119c-18-20-25 12-7 14l22 19m-18-22 12 29M267 115l-25 38m22-40 5 3m-28 34 4 3"/><circle cx="32" cy="133" r="3"/></g>
+    <g fill="#30363b" stroke="#858b90" stroke-width="1.4"><path d="m22 53 15-4 8 8-9 10-16-4Zm17 22 10-5 7 6-6 9-13-4Zm211-25 8-4 9 7-3 9-14 2Z"/><path d="m262 133 13 5-3 9-14-2-3-6Z"/></g>
+    <path d="M89 36h122m-112 4h102m-114 96h126m-112 5h98" stroke="#c1c5c9" stroke-opacity=".24"/>
+   </svg>
    <svg id="craftBag" class="craft-bag" viewBox="0 0 70 64"><path d="M24 18 18 4l17 5L52 4l-6 14c5 10 17 15 17 29 0 12-13 15-28 15S7 59 7 47c0-14 12-19 17-29Z" fill="#876044" stroke="#d9aa70" stroke-width="2"/><path d="M21 19q15 5 28 0m-23 2-8 21m24-20 6 19" fill="none" stroke="#4a352b" stroke-width="3"/></svg>
-   <svg id="craftHammer" class="craft-hammer" viewBox="0 0 82 142"><path d="M34 39h14v96q-7 8-14 0Z" fill="#795035" stroke="#bd986c" stroke-width="2"/><path d="M30 109h22v26q-11 9-22 0Z" fill="#35251b"/><path d="M5 13 14 5h57l6 8v27l-6 7H14L5 40Z" fill="#625e59" stroke="#beb2a1" stroke-width="2"/><path d="M12 14h58M14 37h54M23 6v41M59 6v41" fill="none" stroke="#363231" stroke-width="3"/></svg>
+   <svg id="craftHammer" class="craft-hammer" viewBox="0 0 82 142">
+    <defs>
+     <linearGradient id="hammerSteel" x2=".72" y2="1"><stop stop-color="#aeb6bb"/><stop offset=".32" stop-color="#657078"/><stop offset="1" stop-color="#242a30"/></linearGradient>
+     <linearGradient id="hammerGrip"><stop stop-color="#191c1e"/><stop offset=".45" stop-color="#5e554b"/><stop offset="1" stop-color="#282625"/></linearGradient>
+    </defs>
+    <path d="M34 37h14l2 61 3 32-5 9H34l-5-9 3-32Z" fill="url(#hammerGrip)" stroke="#9d8c77" stroke-width="1.6"/>
+    <path d="m32 91 2 7-3 31 5 7m12-42 3 35-5 7" fill="none" stroke="#c4ab88" stroke-opacity=".4" stroke-width="1.2"/>
+    <path d="M4 15 14 5l16 3h22l16-3 10 10v23L68 49l-16-5H30l-16 5L4 38Z" fill="url(#hammerSteel)" stroke="#14181b" stroke-width="2"/>
+    <path d="m9 17 7-7 14 3h22l14-3 7 7v19l-7 7-14-4H30l-14 4-7-7Z" fill="none" stroke="#b9c2c8" stroke-opacity=".7"/>
+    <path d="m41 18 8 8-8 10-8-10Zm-25 1 5 7-5 7m50-14-5 7 5 7" fill="#30383e" stroke="#c2c8cb" stroke-width="1.15"/><circle cx="41" cy="26" r="2" fill="#e3e8e9"/>
+   </svg>
    <div id="craftImpact" class="craft-impact"></div><div id="craftParticles" class="craft-particles"></div><div id="craftItem" class="craft-item" hidden></div>
   </div></div>
   <p class="craft-hint">Можно создать сразу или указать количество выполнений.</p>

@@ -257,6 +257,9 @@ class Play(Handler):
             if path=='/' and not self.server.telegram:
                 page=page.replace(b'<script defer src="https://telegram.org/js/telegram-web-app.js"></script>',b'').replace(b'data-mode="telegram"',b'data-mode="local"')
             return self.send(200,page,kind)
+        if path=='/art/witcher-icon.png':
+            file=WEB/'art'/'witcher icon.png'
+            if file.is_file(): return self.send(200,file.read_bytes(),'image/png')
         if re.fullmatch(r'/art/(?:WIT_[CRELM][0-9]{2}|card-frame|GrimDeck_card_back)\.webp',path):
             file=WEB/'art'/path.rsplit('/',1)[1]
             if file.is_file(): return self.send(200,file.read_bytes(),'image/webp')

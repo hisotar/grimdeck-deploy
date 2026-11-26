@@ -12,33 +12,36 @@
 .draw-stage[data-r]::before,.draw-stage[data-r]::after{display:block;inset:0;width:auto;height:auto;z-index:0;border:0;border-radius:0;box-shadow:none;transform:none;pointer-events:none}
 .draw-stage[data-r]::before{
  background:
-  radial-gradient(ellipse calc(var(--card-width) * .66) calc(var(--card-height) * .54) at 47% 46%,#fff3de,var(--light) 62%,transparent 100%),
-  radial-gradient(ellipse calc(var(--card-width) * .71) calc(var(--card-height) * .52) at 54% 58%,var(--light),transparent 100%),
-  radial-gradient(ellipse 50% 55% at 50% 51%,var(--light),transparent 100%);
- opacity:var(--glow-rest);animation:rarity-glow 1.4s ease-out;
+  radial-gradient(ellipse 42% 44% at 50% 50%,#fff 5%,var(--light) 49%,transparent 100%),
+  radial-gradient(ellipse 64% 64% at 50% 50%,var(--light),transparent 79%);
+ opacity:var(--glow-rest);animation:rarity-glow 1.5s ease-out;
 }
 .draw-stage[data-r=C]{--glow-rest:.37;--glow-peak:.56}
 .draw-stage[data-r=R]{--glow-rest:.47;--glow-peak:.68}
 .draw-stage[data-r=E]{--glow-rest:.56;--glow-peak:.79}
 .draw-stage[data-r=L]{--glow-rest:.65;--glow-peak:.9}
 .draw-stage[data-r=M]{--glow-rest:.74;--glow-peak:1}
-.draw-stage:is([data-r=L],[data-r=M]){
- --glow-rays:conic-gradient(from 12deg at 50% 52%,transparent 0 26deg,var(--light) 29deg,transparent 31deg 66deg,var(--light) 68deg,transparent 70deg 140deg,var(--light) 144deg,transparent 146deg 206deg,var(--light) 208deg,transparent 210deg 258deg,var(--light) 262deg,transparent 264deg 302deg,var(--light) 304deg,transparent 307deg);
-}
+.draw-stage:is([data-r=L],[data-r=M]){--beam-width:6deg}
 .draw-stage[data-r]::after{
  background:
-  radial-gradient(circle 3px at 24% 32%,#fff6e5,var(--light) 34%,transparent),
-  radial-gradient(circle 2px at 29% 67%,var(--light),transparent),
-  radial-gradient(circle 4px at 76% 26%,#fff6e5,var(--light) 32%,transparent),
-  radial-gradient(circle 3px at 80% 61%,#fff6e5,var(--light) 35%,transparent),
-  radial-gradient(circle 2px at 68% 79%,var(--light),transparent),
-  var(--glow-rays,none);
- mask-image:radial-gradient(ellipse at center,#000 45%,transparent 73%);
- opacity:0;animation:rarity-sparks 1.05s ease-out;
+  radial-gradient(circle 4px at 11% 32%,white 10%,var(--light) 35%,transparent),
+  radial-gradient(circle 3px at 16% 66%,white,var(--light) 45%,transparent),
+  radial-gradient(circle 4px at 83% 24%,white 10%,var(--light) 38%,transparent),
+  radial-gradient(circle 3px at 91% 61%,white,var(--light) 40%,transparent),
+  radial-gradient(circle 2px at 12% 81%,var(--light),transparent),
+  radial-gradient(circle 3px at 79% 83%,white,var(--light) 38%,transparent),
+  radial-gradient(circle 2px at 32% 10%,var(--light),transparent),
+  radial-gradient(circle 3px at 64% 10%,white,var(--light) 42%,transparent),
+  radial-gradient(circle 3px at 24% 91%,white,var(--light) 40%,transparent),
+  radial-gradient(ellipse at center,transparent 44%,var(--light) 46%,white 47%,transparent 49%,transparent 54%,var(--light) 55%,transparent 57%),
+  repeating-conic-gradient(from 12deg,transparent 0 29deg,var(--light) 32deg,transparent calc(32deg + var(--beam-width,3deg)) 45deg);
+ -webkit-mask-image:radial-gradient(ellipse at center,transparent 13%,#000 43% 62%,transparent 75%);
+ mask-image:radial-gradient(ellipse at center,transparent 13%,#000 43% 62%,transparent 75%);
+ opacity:0;animation:rarity-sparks 1.15s cubic-bezier(.15,.7,.25,1);
 }
-@keyframes rarity-glow{0%{opacity:0;transform:scale(.8)}18%{opacity:var(--glow-peak);transform:scale(1.03)}}
-@keyframes rarity-sparks{0%{opacity:0;transform:translateY(5px) scale(.85)}23%{opacity:var(--glow-peak)}100%{opacity:0;transform:translateY(-12px) scale(1.09)}}
-@media(prefers-reduced-motion:reduce){.draw-stage[data-r]::before{animation:none}.draw-stage[data-r]::after{display:none}}
+@keyframes rarity-glow{0%{opacity:0;transform:scale(.58,.94)}10%{opacity:var(--glow-peak);transform:scale(1.04)}34%{transform:scale(1.08)}100%{transform:none}}
+@keyframes rarity-sparks{0%{opacity:0;transform:scale(.64,.83)}14%{opacity:var(--glow-peak)}100%{opacity:0;transform:translateY(-12px) scale(1.27,1.09)}}
+@media(prefers-reduced-motion:reduce){.draw-stage[data-r]::before{animation:none}.draw-stage[data-r]::after{display:none;animation:none}}
 
 /* The shared frame supplies the ornament; the old rarity edge remains. */
 .front,.tile{display:grid;grid-template:1fr / minmax(0,1fr);padding:0;border:1px solid var(--tone,#746358);border-radius:7px;background:#181414;box-shadow:0 4px 10px #0c0b08a0;overflow:hidden}
@@ -231,7 +234,7 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .draw-stage{border:1px solid #524333;border-radius:12px;background:radial-gradient(ellipse at 50% 52%,#4a3828,#25231d 65%,#1b1c19);box-shadow:inset 0 0 0 3px #17171385}
 .draw-stage[data-r]::before,.draw-stage[data-r]::after{border-radius:inherit}
 .draw-resumed .draw-stage[data-r]::before,.draw-resumed .new-card-label{animation:none}
-.draw-resumed .draw-stage[data-r]::after{display:none}
+.draw-resumed .draw-stage[data-r]::after{display:none;animation:none}
 
 /* The reading screen uses the same edge-to-edge artwork as the collection. */
 .viewing-card :is(.game-header,#notice:empty,nav){display:none}
@@ -263,3 +266,64 @@ nav a{
 nav a svg{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round}
 nav a[aria-current]{border-color:#cba06e;color:#ffe7bb;background:radial-gradient(ellipse at top,#a46e426b,transparent 80%),linear-gradient(#61452f,#35271d 56%,#493321);box-shadow:inset 0 1px #f8d49090,inset 0 0 0 2px #2e2017,0 3px #160e0b,0 4px #9e7549}
 nav a:active{transform:translateY(2px);box-shadow:inset 0 1px 4px #140c07,0 1px #100d0b}
+
+/* Castle stone, blackened iron and engraved silver. Reward colors remain distinct. */
+:root{
+ --line:#626972;--gold:#d5c9b4;--muted:#bbc0c7;--steel-ink:#edf0f2;--steel-edge:#8c949e;
+ --iron:linear-gradient(156deg,#343a42,#25292f 45%,#1b1f24);
+ --bevel:linear-gradient(#515964,#333942 48%,#272c33 50%,#30363e);
+ --recess:inset 0 1px #e9eff52b,inset 0 0 0 3px #0c101675,0 4px 12px #090c1080;
+ --stone: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='384' height='292' viewBox='0 0 384 292'%3E%3Cpath d='M0 1h384M0 96h384M0 194h384M125 0v96m176 0V0M65 96v98m175-98v98m96-98v98M160 194v98m139-98v98M38 0l12 23-8 16 17 16 4 24 23 17m-27-41 18-4 18 10 8 20M261 96l-13 19 12 15-8 24 17 13-5 27m-12-40-17 10-20-3M106 194l12 17-6 20 15 13 7 25 24 23m-31-48-21 5-10 13-19 2M342 0l-11 18 9 17-6 19 12 21-9 21' fill='none' stroke='%230b0e12' stroke-width='3' stroke-opacity='.55'/%3E%3Cpath d='M0 3h384M0 98h384M0 196h384M127 3v93m176 0V3M67 98v96m175-96v96m96-96v96M162 196v96m139-96v96' fill='none' stroke='%2388919a' stroke-opacity='.16'/%3E%3Cpath d='M15 41h15m147-11h33m-45 22h8m150 101h59M79 135h36m2 33h21m123 50h12m-81 35h48m-70-8h13M0 221h29m313 55h22' stroke='%2377818a' stroke-opacity='.12'/%3E%3C/svg%3E");
+ --filigree:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='76' height='24' viewBox='0 0 76 24'%3E%3Cpath d='M1 12h13c5 0 8-7 13-7 3 0 5 3 3 5-2 2-5 0-5-2m-11 4c5 0 8 7 13 7 3 0 5-3 3-5-2-2-5 0-5 2m50-4H62c-5 0-8-7-13-7-3 0-5 3-3 5 2 2 5 0 5-2m11 4c-5 0-8 7-13 7-3 0-5-3-3-5 2-2 5 0 5 2M38 7l5 5-5 5-5-5Z' fill='none' stroke='%23aeb6bd' stroke-opacity='.65'/%3E%3C/svg%3E");
+}
+body{background:radial-gradient(ellipse at 50% 0,#727e9229,transparent 65%),var(--stone) top center / 384px 292px,#1b2026;color:var(--steel-ink)}
+:is(.deck-tools,.spin-panel,.craft-row,.shuffle-panel,.shuffle-result,.card-view-copy,.card-view-actions,dialog){border-color:var(--line);background:var(--iron);box-shadow:var(--recess)}
+:is(.spin-panel,.spin-panel b,.shuffle-panel h2,.shuffle-result,.card-view h1,.card-view-lore,.wallet dd){color:var(--steel-ink)}
+.game-header{border-color:var(--line)}
+.game-brand{color:#d5dbe2}
+.wallet{border-color:var(--steel-edge);background:#636b75;box-shadow:var(--recess)}
+.wallet div{background:var(--iron)}
+.wallet div:first-child{background:linear-gradient(145deg,#46515e,#292f38)}
+.wallet dt{color:var(--muted)}
+button:not(.tile,.front,.primary,.danger),input,select,.deck-tool .deck-back,.card-view-actions button,nav a{background:var(--bevel);border-color:var(--steel-edge);color:var(--steel-ink);box-shadow:var(--recess)}
+.primary{background:linear-gradient(#eee4d1,#c5b394);color:#231f19;border-color:#f0e2cb;box-shadow:inset 0 0 0 2px #493d2d3d,0 3px 5px #0a0c1099}
+.deck-tools-grid button span,.craft-row button:not(.primary){color:#d5dce4}
+.deck-tools-grid button{background:var(--filigree) center bottom -3px no-repeat,var(--bevel);padding-bottom:14px}
+nav{background:linear-gradient(#242a31f7,#14181d);border-color:var(--line)}
+nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria-current]{border-color:#d6c6a6;color:#fff0d5;background:linear-gradient(#616169,#3b3a3c);box-shadow:inset 0 0 0 2px #252628,inset 0 0 0 3px #d6c6a674,0 3px #111418}
+.deck-plaque{grid-template-columns:1fr;justify-items:center;gap:0;padding:8px 18px 16px;border-color:#9da5ae;background:var(--filigree) left 10px center no-repeat,var(--filigree) right 10px center no-repeat,radial-gradient(ellipse at 50% 0,#747e8b72,transparent 70%),var(--iron);box-shadow:var(--recess)}
+.deck-plaque::before{border-color:#b8c0c766}
+.deck-plaque h1{color:#eef0ef;text-shadow:0 2px 2px #0d1014,0 0 15px #aab8c862}
+.deck-emblem{width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 2px 4px #0b0d12)}
+.deck-corner{width:23px;height:23px;border-color:#b1bbc3;background:linear-gradient(135deg,#353d46,#b4bec6 35%,#5d6873 68%,#222931)}
+.deck-corner::after{background:#e1e7ea;box-shadow:1px 1px 2px #182026}
+:is(.deck-tool>h1,#album>h1,#pack>h1){padding:10px 12px 15px;border:1px solid var(--line);border-radius:7px;text-align:center;background:var(--filigree) center bottom -5px no-repeat,var(--iron);box-shadow:var(--recess)}
+.album-category-title,.card-view-stats,.craft-inventory{border-color:var(--line)}
+.album-category-title{color:var(--tone,var(--steel-ink))}
+.card-view-stats div,.shuffle-loot li{background:#181d22;color:var(--muted);border-color:var(--line)}
+.card-view-stats dd{color:var(--steel-ink)}
+:is(.draw-stage,.shuffle-scene,.card-view-art){border-color:var(--line);background:radial-gradient(ellipse at 50% 48%,#4c5563a0,transparent 72%),var(--stone) center / 300px auto,#1b2026;box-shadow:var(--recess)}
+.draw-stage{overflow:hidden}
+.card-portrait{background:radial-gradient(ellipse at 50% 40%,#363d46,#171a20 77%)}
+.shuffle-reveal-copy{background:#20242bf5}
+.mastery-steps li{border-color:var(--line);color:var(--muted)}
+.craft-icon{border-color:var(--line);background:var(--iron)}
+.craft-quantity input[aria-invalid=true]{border-color:#efa38f}
+.boost-status{background:var(--iron);border-color:#837964;color:#e8d8b8}
+
+/* A forge table with riveted iron edges, incised lines and a carved strike plate. */
+.craft-overlay{background:#090c12c9}
+.craft-bench{border-color:#555e69;background:var(--filigree) center 4px no-repeat,var(--filigree) center calc(100% - 4px) no-repeat,radial-gradient(ellipse at 48% 48%,#aebbc647,transparent 70%),repeating-linear-gradient(1deg,#070b1047 0 1px,transparent 1px 5px),linear-gradient(#303740,#1a1e24);box-shadow:inset 0 0 0 2px #989fa45c,inset 0 0 26px 5px #10141a,0 5px 0 #101419,0 16px 34px #07090c}
+.bench-tools{position:absolute;inset:7%;width:86%;height:86%;filter:drop-shadow(1px 2px 1px #07090d);pointer-events:none}
+.bench-nail{background:linear-gradient(25deg,#343b41 38%,#181c22 43% 52%,#abb3b9 56%,#5a6269 68%);box-shadow:0 1px 3px #080b10}
+.bench-nail.lower{top:auto;bottom:10px}
+.bench-anvil{border-color:#858e97;border-radius:12px;clip-path:polygon(10% 0,90% 0,100% 20%,100% 80%,90% 100%,10% 100%,0 80%,0 20%);background:linear-gradient(164deg,#69737e,#3c444e 36%,#24292f 74%,#15191e);box-shadow:inset 0 0 0 4px #171c227d,inset 0 -9px #10141a66}
+.bench-anvil::before,.bench-anvil::after{content:'';position:absolute;inset:7px;border:1px solid #a6aeb460;border-radius:8px}
+.bench-anvil::after{inset:12px;background:var(--filigree) center no-repeat;border-color:#080c1266}
+.craft-hammer{filter:drop-shadow(3px 5px 3px #090c10)}
+.craft-impact{z-index:1;inset:calc(50% - 39px) 7% auto;height:78px;background:radial-gradient(ellipse at center,#fff7d6 1%,#ffcb87 9%,#ee8c4555 25%,transparent 64%);}
+.craft-impact::before,.craft-impact::after{content:'';position:absolute;inset:18% 12%;border-radius:50%;border:1px solid #ffcf8d;box-shadow:0 0 13px #f7804670,inset 0 0 10px #f7a25b70}
+.craft-impact::after{inset:45% 0;border:0;background:radial-gradient(ellipse,#fff9dd,#ffb064 15%,transparent 68%);box-shadow:none}
+.bench-spark{height:2px;background:linear-gradient(90deg,#fff5d3,#ffb05c 55%,transparent);box-shadow:0 0 6px #ff9d50}
+.bench-ember{width:4px;height:4px;border-radius:50%;background:#ffc07a;box-shadow:0 0 7px #ff7839}
+.craft-item{border-color:#c8a977;background:radial-gradient(ellipse at top,#605648,#22252b 82%)}

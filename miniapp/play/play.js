@@ -516,7 +516,7 @@ async function craftAtBench(id,quantity){
  say('');
  if(motion.matches||!table.animate){confirm();DrawSound.cue('forge-ready');return;}
  item.hidden=true;overlay.hidden=false;
- const jobs=[], timers=[], epoch=document.timeline.currentTime, duration=1660, strikes=[720,1020,1330];
+ const jobs=[], timers=[], epoch=document.timeline.currentTime, duration=1890, strikes=[815,1165,1515];
  const animate=(el,frames,options)=>{
   const a=el.animate(frames,options);jobs.push(a);if(epoch!=null)a.startTime=epoch;a.finished.catch(()=>{});return a;
  };
@@ -527,16 +527,19 @@ async function craftAtBench(id,quantity){
   const dust=recipe.material==='dust';
   if(dust)animate(bag,[{opacity:0,transform:'translate(-32px,-24px) rotate(-25deg)'},{offset:.27,opacity:1,transform:'translate(0,0) rotate(0)'},{offset:.48,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{offset:.76,opacity:1,transform:'translate(13px,-6px) rotate(117deg)'},{opacity:0,transform:'translate(-22px,-18px) rotate(74deg)'}],{duration:740,fill:'both'});
   const at=(ms,frame)=>({...frame,offset:ms/duration});
-  const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(43px,7px) rotate(-96deg)';
+  const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(28px,-3px) rotate(-96deg)';
   const motionFrames=[at(0,{transform:rest})];
-  for(const ms of strikes)motionFrames.push(at(ms-180,{transform:raised,easing:'cubic-bezier(.72,0,.9,.42)'}),at(ms,{transform:hit,easing:'ease-out'}),at(ms+95,{transform:raised}));
+  for(const ms of strikes)motionFrames.push(at(ms-205,{transform:raised,easing:'cubic-bezier(.72,0,.9,.42)'}),at(ms,{transform:hit,easing:'ease-out'}),at(ms+105,{transform:raised}));
   motionFrames.push(at(duration,{transform:rest}));
   const finish=animate(hammer,motionFrames,{duration,fill:'both'});
   const impact=$('craftImpact');
-  for(const [i,ms] of strikes.entries())animate(impact,[
-   {opacity:0,transform:'scale(.55)'},{offset:.13,opacity:.34+i*.16,transform:'scale(.75)'},
-   {opacity:0,transform:'scale(1.22)'}
-  ],{duration:225,delay:ms});
+  for(const [i,ms] of strikes.entries()){
+   animate(impact,[
+    {opacity:.88+i*.06,transform:'scale(.42,.6)'},{offset:.23,opacity:.68,transform:'scale(.86)'},
+    {opacity:0,transform:'scale(1.27,1.12)'}
+   ],{duration:290,delay:ms,easing:'ease-out'});
+   animate(table,[{transform:'translateY(0)'},{offset:.12,transform:'translateY(2px)'},{offset:.32,transform:'translateY(-1px)'},{transform:'translateY(0)'}],{duration:145,delay:ms});
+  }
   const spread=Math.min(102,table.clientWidth*.31);
   for(let i=0;i<(dust?26:14);i++){
    const bit=node('i',undefined,dust?'bench-dust':'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
@@ -550,10 +553,16 @@ async function craftAtBench(id,quantity){
    }
    frames.push(at(duration,{opacity:0}));animate(bit,frames,{duration,fill:'both'});
   }
-  for(const [idx,ms] of strikes.entries())for(let i=0;i<10;i++){
-   const spark=node('i',undefined,'bench-spark');air.append(spark);
-   const theta=(i+.4)*Math.PI/10, x=Math.cos(theta)*(30+i*5+idx*8), y=-Math.sin(theta)*(20+i*4+idx*5);
-   animate(spark,[{transform:'translate(0,0) scale(.6)',opacity:0},{offset:.15,opacity:1},{transform:`translate(${x}px,${y}px) rotate(${-theta*180/Math.PI}deg) scale(.24)`,opacity:0}],{duration:220,delay:ms+idx*3,fill:'both',easing:'ease-out'});
+  for(const [idx,ms] of strikes.entries())for(let i=0;i<18;i++){
+   const ember=i>=12, spark=node('i',undefined,ember?'bench-ember':'bench-spark');air.append(spark);
+   const theta=ember?(i-12+.4)*Math.PI/6:(i+.35)*Math.PI/12;
+   const x=Math.cos(theta)*spread*(.57+i%5*.11+idx*.09), y=-Math.sin(theta)*(35+i%7*6+idx*6);
+   const turn=-theta*180/Math.PI;
+   animate(spark,[
+    {transform:`translate(0,0) rotate(${turn}deg) scale(.62)`,opacity:1},
+    {offset:.54,transform:`translate(${x*.72}px,${y}px) rotate(${turn}deg) scale(${ember?1:.83})`,opacity:.84},
+    {transform:`translate(${x}px,${y+(ember?22:7)}px) rotate(${turn}deg) scale(.2)`,opacity:0}
+   ],{duration:(ember?332:235)+i%4*10,delay:ms+(ember?23:0),easing:'cubic-bezier(.2,.6,.25,1)'});
   }
   await finish.finished;
  }catch{}finally{
