@@ -170,10 +170,11 @@ function buildCraft(){
   const copy=node('div'), title=node('strong',craftTitle(recipe)), amount=node('small');
   copy.append(title,amount);if(boost)copy.append(node('small',boostInfo[boost][1]));
   const controls=node('div',undefined,'craft-quantity');
-  const count=node('input'), max=node('button','Макс.');
+  const count=node('input'), max=node('button','Макс.'), reset=node('button','Сброс');
   count.type='text';count.inputMode='numeric';count.maxLength=2;count.value='1';
   count.setAttribute('aria-label',`Количество выполнений: ${title.textContent}`);
   max.type='button';max.setAttribute('aria-label',`Максимальное количество: ${title.textContent}`);
+  reset.type='button';reset.setAttribute('aria-label',`Сбросить количество до 1: ${title.textContent}`);
   const button=node('button','Создать','primary craft-submit');button.type='button';
   button.setAttribute('aria-label',`Создать: ${title.textContent}`);
   const receipt=node('small',undefined,'craft-receipt');receipt.setAttribute('role','status');
@@ -183,12 +184,13 @@ function buildCraft(){
    add.onclick=()=>{count.value=Math.min(entry.limit,batchCount(count.value)+step);updateRecipe(entry,busy||!!pending);};
    return add;
   });
-  const entry={recipe,id,amount,title,count,max,steps,button,receipt,limit:0};
+  const entry={recipe,id,amount,title,count,max,reset,steps,button,receipt,limit:0};
   count.oninput=()=>updateRecipe(entry,busy||!!pending);
   count.onkeydown=e=>{if(e.key==='Enter'&&!button.disabled){e.preventDefault();button.click();}};
   max.onclick=()=>{count.value=entry.limit;updateRecipe(entry,busy||!!pending);};
+  reset.onclick=()=>{count.value='1';updateRecipe(entry,busy||!!pending);};
   button.onclick=()=>{const n=Number(count.value);count.blur();transact('craft',id,n);};
-  controls.append(count,...steps,max);row.append(craftIcon(boost||'spins'),copy,button,controls,receipt);
+  controls.append(count,...steps,max,reset);row.append(craftIcon(boost||'spins'),copy,button,controls,receipt);
   $(boost?'craftBoostList':'craftSpinList').append(row);recipeRows.push(entry);
   if(boost){
    const item=node('div',undefined,'craft-row'), info=node('div'), status=node('small');
@@ -199,13 +201,13 @@ function buildCraft(){
  }
 }
 function batchCount(value){return /^\d{1,2}$/.test(value)?Number(value):0;}
-function updateRecipe({recipe,amount,title,count,max,steps,button,limit,have},blocked){
+function updateRecipe({recipe,amount,title,count,max,reset,steps,button,limit,have},blocked){
  const n=batchCount(count.value), valid=n>=1&&n<=limit;
  title.textContent=craftTitle(recipe,valid?n:1);
  const cost=craftCost(recipe,valid?n:1), stock=recipe.material==='dust'?` · в наличии: ${have}`:'';
  amount.textContent=limit&&!valid?`Введите от 1 до ${limit}`:`${cost}${stock}`;
  count.setAttribute('aria-invalid',String(!!limit&&!valid));
- count.disabled=blocked||!limit;max.disabled=blocked||!limit||(valid&&n===limit);
+ count.disabled=reset.disabled=blocked||!limit;max.disabled=blocked||!limit||(valid&&n===limit);
  steps.forEach(add=>{add.disabled=blocked||!limit||n===limit;});
  button.disabled=blocked||!valid;
 }

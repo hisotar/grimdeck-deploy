@@ -1,9 +1,26 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="preload" as="image" href="/art/card-frame.webp" type="image/webp"><link rel="preload" as="image" href="/art/GrimDeck_card_back.webp" type="image/webp"><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header class="game-header">
  <div class="game-brand"><b>✦ GRIMDECK</b><button id="sound" type="button">Звук</button></div>
  <dl class="wallet" aria-label="Баланс">
-  <div><dt>Крутки</dt><dd id="totalSpins">—</dd></div>
-  <div><dt>Пыль</dt><dd id="dust">—</dd></div>
-  <div><dt>Монеты</dt><dd id="coins">—</dd></div>
+  <div><dt title="Крутки"><span class="wallet-label">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+   <rect x="8" y="5" width="14" height="21" rx="2" transform="rotate(-22 15 15)" fill="#333b3b" stroke="#8e9fa1"/>
+   <rect x="11" y="5" width="14" height="21" rx="2" transform="rotate(15 18 15)" fill="#323635" stroke="#c0af91"/>
+   <rect x="9" y="5" width="14" height="22" rx="2" fill="#242728" stroke="#d9c097" stroke-width="1.3"/>
+   <path d="M16 9l4 7-4 7-4-7Z" fill="#697f84" stroke="#cfdfdd"/><circle cx="16" cy="16" r="1.4" fill="#f6e5bf"/>
+  </svg></dt><dd id="totalSpins">—</dd></div>
+  <div><dt title="Пыль"><span class="wallet-label">Пыль</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+   <path d="M5 24q6-1 8-5t7 0q2 4 7 5-10 5-22 0Z" fill="#8d5e39" stroke="#d5a36e"/>
+   <path d="M16 4l1.4 4.6L22 10l-4.6 1.4L16 16l-1.4-4.6L10 10l4.6-1.4Z" fill="#ffe3a1"/>
+   <path d="M24 9l.8 2.2L27 12l-2.2.8L24 15l-.8-2.2L21 12l2.2-.8Z" fill="#e8b67a"/>
+   <circle cx="8" cy="16" r="1.25" fill="#e8b67a"/><circle cx="15" cy="22" r="1" fill="#f1c98b"/><circle cx="20" cy="23" r=".8" fill="#ffdf9f"/><circle cx="24" cy="18" r=".9" fill="#e8b67a"/>
+  </svg></dt><dd id="dust">—</dd></div>
+  <div><dt title="Монеты (кроны)"><span class="wallet-label">Монеты (кроны)</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+   <defs><linearGradient id="crownMetal" x2=".8" y2="1"><stop stop-color="#ffe6a1"/><stop offset=".47" stop-color="#c99543"/><stop offset="1" stop-color="#855324"/></linearGradient></defs>
+   <circle cx="16" cy="17" r="13" fill="#5a351b" stroke="#2e2115"/>
+   <circle cx="16" cy="15.5" r="12.5" fill="url(#crownMetal)" stroke="#edc77e"/>
+   <circle cx="16" cy="15.5" r="10" fill="none" stroke="#73461f" stroke-width="1.25" stroke-dasharray=".65 1.55"/>
+   <path d="m9 12 3 2 4-5 4 5 3-2-2 7H11Zm2 9h10" fill="#965b28" stroke="#613813" stroke-linecap="round" stroke-linejoin="round"/>
+   <path d="m10 12.7 2.2 1.7 3.8-4.6 3.8 4.6 2.2-1.7M12 18h8" fill="none" stroke="#ffe1a0" stroke-width=".8" stroke-linecap="round"/>
+  </svg></dt><dd id="coins">—</dd></div>
  </dl>
 </header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
  <div class="deck-plaque">

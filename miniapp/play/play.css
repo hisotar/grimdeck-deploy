@@ -21,7 +21,7 @@
 }
 .draw-stage[data-r=R]{--glow-rest:.25;--glow-peak:.63}
 .draw-stage[data-r=R]::after{
- background:conic-gradient(from 210deg,transparent 0 184deg,var(--light) 215deg,#eeffff 254deg,transparent 289deg);
+ background:conic-gradient(transparent 45deg,var(--light) 67deg,#eeffff 90deg,var(--light) 113deg,transparent 135deg 225deg,var(--light) 247deg,#eeffff 270deg,var(--light) 293deg,transparent 315deg);
  -webkit-mask-image:radial-gradient(ellipse at center,transparent 54%,#000 57%,transparent 61%);
  mask-image:radial-gradient(ellipse at center,transparent 54%,#000 57%,transparent 61%);
  animation:reveal-arc .82s ease-out;
@@ -45,7 +45,7 @@
 }
 @keyframes rarity-glow{0%{opacity:0;transform:scale(.86)}18%{opacity:var(--glow-peak);transform:scale(1.02)}100%{transform:none}}
 @keyframes reveal-edge{0%{opacity:0;transform:scaleX(.62)}22%{opacity:.66}100%{opacity:0;transform:scaleX(1.58)}}
-@keyframes reveal-arc{0%{opacity:0;transform:rotate(-20deg) scale(.93)}24%{opacity:.67}100%{opacity:0;transform:rotate(12deg) scale(1.1)}}
+@keyframes reveal-arc{0%{opacity:0;transform:scale(.93,1.04)}24%{opacity:.67}100%{opacity:0;transform:scale(1.1)}}
 @keyframes reveal-ring{0%{opacity:0;transform:scale(.78)}23%{opacity:.72}100%{opacity:0;transform:scale(1.2)}}
 @keyframes reveal-rays{0%{opacity:0;transform:scale(.81)}22%{opacity:.78}100%{opacity:0;transform:scale(1.14)}}
 @keyframes reveal-crown{0%{opacity:0;transform:scale(.82)}20%{opacity:.85}100%{opacity:0;transform:scale(1.18)}}
@@ -98,7 +98,9 @@
 .wallet{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0;overflow:hidden;text-align:center;border:1px solid #806343;border-radius:9px;background:#694e33}
 .wallet div{padding:6px 3px;background:linear-gradient(155deg,#3a2a1c,#28211a)}
 .wallet div:first-child{background:linear-gradient(155deg,#4e3520,#322518)}
-.wallet dt{font-size:12px;color:#efd2a8}
+.wallet dt{display:grid;place-items:center;margin-bottom:2px}
+.wallet-icon{display:block;width:28px;height:28px}
+.wallet-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .wallet dd{margin:0;color:#fff0d5;font-size:clamp(17px,5vw,23px);font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .spin-panel{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:3px 8px;margin:9px 0;padding:7px 9px;border:1px solid #644e35;border-radius:7px;background:linear-gradient(115deg,#35291d,#24221b);box-shadow:inset 0 0 0 2px #211a1380;color:#d5c6ae;font-size:12px;font-variant-numeric:tabular-nums}
 .spin-panel b{color:#ecd1a7}.spin-panel small{font-size:inherit}
@@ -200,7 +202,7 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .craft-recipe{grid-template-columns:auto minmax(0,1fr) auto;gap:4px 7px}
 .craft-recipe strong{font-size:15px}
 .craft-recipe .craft-submit{color:#f1dfbc;padding-inline:8px}
-.craft-quantity{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.craft-quantity{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .craft-quantity input{width:48px;min-height:44px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
 .craft-quantity input[aria-invalid=true]{border-color:#efa38f}
 .craft-quantity button{padding-inline:8px}
@@ -289,7 +291,6 @@ body{background:radial-gradient(ellipse at 50% 0,#8a796129,transparent 65%),var(
 .wallet{border-color:var(--steel-edge);background:#41403c;box-shadow:var(--recess)}
 .wallet div{background:var(--iron)}
 .wallet div:first-child{background:linear-gradient(145deg,#2b2a26,#1b1c1a)}
-.wallet dt{color:var(--muted)}
 button:not(.tile,.front,.primary,.danger),input,select,.deck-tool .deck-back,.card-view-actions button,nav a{background:var(--bevel);border-color:var(--steel-edge);color:var(--steel-ink);box-shadow:var(--recess)}
 .primary{background:linear-gradient(#443a2c,#2c261c);color:#f1dfbc;border-color:#817055;box-shadow:inset 0 0 0 2px #493d2d3d,0 3px 5px #0a0c1099}
 .deck-tools-grid button span,.craft-row button:not(.primary){color:#d5dce4}
