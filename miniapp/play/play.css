@@ -113,6 +113,7 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 .shuffle-air{z-index:1;pointer-events:none}
 /* Slightly enlarge the 2:3 print to crop the black margins baked into the WebP. */
 .back,.stack,.shuffle-stack i,.shuffle-flying{background:#302821 url('/art/GrimDeck_card_back.webp') center / 106% auto no-repeat;background-origin:border-box;background-clip:border-box}
+.back.startup-back-fallback,.stack.startup-back-fallback,.shuffle-stack i.startup-back-fallback{background-image:radial-gradient(ellipse at center,#594437,transparent 67%),repeating-linear-gradient(45deg,#332a24 0 5px,#3d3129 6px 7px)}
 .shuffle-stack i,.shuffle-flying{
  position:absolute;width:96px;aspect-ratio:2 / 3;border:1px solid #b89258;border-radius:7px;
  box-shadow:0 2px #8b6d48,0 4px #2d2117,0 6px 8px #100c0999;

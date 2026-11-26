@@ -28,8 +28,9 @@ const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undef
 const say=text=>{$('notice').textContent=text;};
 const qty=id=>state?.owned[id]||0;
 
-async function api(path,data){
- const res=await fetch(`/api/${path}`,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+async function api(path,data,signal){
+ const options=data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
+ const res=await fetch(`/api/${path}`,{...options,signal});
  const out=await res.json();
  if(!res.ok)throw Object.assign(new Error(out.error||'Запрос не выполнен'),{status:res.status});
  return out;
@@ -354,7 +355,7 @@ async function route(){
  const returning=activeDetail?.from===id?activeDetail:null;
  if(activePane!==id)stopScene?.();
  if(id!=='tool-shuffle')hideShuffleReveal();
- const animate=activePane&&activePane!==id&&!motion.matches&&$(id).animate;
+ const animate=!main.inert&&activePane&&activePane!==id&&!motion.matches&&$(id).animate;
  if(animate){
   transition=$(activePane).animate([{opacity:1},{opacity:0}],{duration:85,fill:'forwards'});
   try{await transition.finished;}catch{}
@@ -373,7 +374,7 @@ async function route(){
  }
  for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id==='hunt'?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
- if(id==='hunt')HuntUI.resumed();
+ if(id==='hunt'&&!main.inert)HuntUI.resumed();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open&&!dustConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo({top:returning?.top??0,behavior:'instant'});
@@ -693,15 +694,60 @@ setInterval(()=>{if(!busy)refresh();if((state?.freeNextAt&&clock()>=state.freeNe
 $('detailBack').onclick=returnFromDetail;
 tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(dustConfirm.open)dustConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(targetPane()==='hunt')go('battle');else if(targetPane()==='detail')returnFromDetail();else go('home');});
 HuntUI.bind();
-route();
+
+function gameStyleReady(signal){
+ const style=$('gameStyle');
+ if(style.media==='all')return Promise.resolve();
+ if(style.dataset.failed)return Promise.reject(new Error('game stylesheet unavailable'));
+ return new Promise((resolve,reject)=>{
+  const cleanup=()=>{
+   style.removeEventListener('load',ready);style.removeEventListener('error',failed);
+   signal.removeEventListener('abort',failed);
+  };
+  const ready=()=>{cleanup();resolve();};
+  const failed=()=>{cleanup();reject(new Error('game stylesheet unavailable'));};
+  style.addEventListener('load',ready);style.addEventListener('error',failed);
+  signal.addEventListener('abort',failed,{once:true});
+ });
+}
+async function optionalStartup(promise,fallback,ms){
+ let timer;
+ try{return await Promise.race([promise.catch(()=>fallback),new Promise(resolve=>{timer=setTimeout(resolve,ms,fallback);})]);}
+ finally{clearTimeout(timer);}
+}
+async function firstScreenArt(){
+ const pane=$(activePane), images=[...pane.querySelectorAll('img')].filter(img=>{
+  const box=img.getBoundingClientRect();return box.width>0&&box.height>0&&box.bottom>0&&box.top<innerHeight;
+ });
+ const hasBack=activePane==='home'||activePane==='tool-shuffle';
+ const back=hasBack?new Image():null;
+ if(back){back.src='/art/GrimDeck_card_back.webp';images.push(back);}
+ // Wait only for images in the first viewport. Failed or slow art keeps its styled placeholder.
+ const unready=new Set(images);
+ await optionalStartup(Promise.all(images.map(async img=>{
+  img.loading='eager';await img.decode();unready.delete(img);
+ }).map(task=>task.catch(()=>{}))),null,2000);
+ for(const img of unready){
+  if(img===back){for(const el of pane.querySelectorAll('.back,.stack,.shuffle-stack i'))el.classList.add('startup-back-fallback');}
+  else if(img.classList.contains('deck-emblem'))img.style.visibility='hidden';
+  else img.remove();
+ }
+}
 (async()=>{
+ if(!grimBoot.start())return;
+ const {signal}=grimBoot;
  try{
   tg?.ready();tg?.expand();
-  const session=await api('session',local?{}:{initData:tg?.initData||''});
+  const [session]=await Promise.all([api('session',local?{}:{initData:tg?.initData||''},signal),gameStyleReady(signal)]);
+  if(signal.aborted)return;
   key=`grimdeck.pending.${session.player}`;
   try{pending=JSON.parse(sessionStorage.getItem(key));}catch{}
-  const [out,images]=await Promise.all([api('state'),api('art').catch(()=>[])]);
-  art=new Set(images);accept(out);refresh();HuntUI.resumed();if(!$('album').hidden)album();
+  const [out,images]=await Promise.all([api('state',undefined,signal),optionalStartup(api('art',undefined,signal),[],2200)]);
+  if(signal.aborted)return;
+  art=new Set(images);accept(out);refresh();await route();
   say(pending?'Предыдущий запрос не завершён. Можно повторить.':local?'Локальный стенд · стартовый баланс 120 монет':'');
- }catch(e){say(e.message);}
+  await firstScreenArt();
+  if(signal.aborted)return;
+  grimBoot.show(main);HuntUI.resumed();
+ }catch(e){grimBoot.fail(e.status?e.message:undefined);}
 })();
