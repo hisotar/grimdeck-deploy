@@ -71,7 +71,9 @@
 .front .tarot-title{font-size:clamp(15px,4.6vw,19px);padding:7px 9px}
 
 .draw-stage{margin-bottom:12px}
-.new-card-slot{position:absolute;z-index:1;top:calc(50% + var(--card-height) / 2);left:50%;width:calc(var(--card-width) - 36px);transform:translateX(-50%);overflow:hidden;pointer-events:none}
+.draw-result{position:absolute;z-index:1;top:calc(50% + var(--card-height) / 2 + 3px);left:50%;width:max-content;max-width:calc(100% - 20px);transform:translateX(-50%);pointer-events:none}
+.draw-result.shown{display:flex;align-items:center;justify-content:center;gap:7px;padding:3px 9px;border:1px solid var(--tone,#d1c7b5);border-radius:5px;background:#151514;color:var(--tone,#e4dfd3);font:700 12px/1.2 var(--display-font)}
+.draw-result .new-card-label{padding:2px 4px;border:0;border-radius:3px;line-height:1.1;font-size:10px;letter-spacing:.05em;box-shadow:none;animation:none}
 .new-card-label{
  display:block;padding:4px 0 5px;text-align:center;border:1px solid var(--green);border-top:0;border-radius:0 0 9px 9px;
  background:linear-gradient(#243329,#19261e);color:#d4f2d1;box-shadow:inset 0 0 10px #9bdd9e19;
@@ -176,9 +178,9 @@ button.danger{border-color:#92584c;background:#39241f;color:#ffd4c9}
 }
 .craft-hammer,.craft-bag,.craft-particles,.craft-item{position:absolute;top:50%;left:50%}
 .craft-hammer{z-index:2;width:60px;height:104px;margin:-52px 0 0 -30px;transform:translate(66px,15px) rotate(-49deg);filter:drop-shadow(3px 5px 3px #22160d)}
-.craft-bag{z-index:2;width:55px;height:51px;margin:-3px 0 0 -27.5px;transform-origin:50% 88%;opacity:0;filter:drop-shadow(2px 3px 3px #22160d)}
+.craft-bag{z-index:2;width:55px;height:51px;margin:-25.5px 0 0 -27.5px;opacity:0;filter:drop-shadow(2px 3px 3px #22160d)}
 .craft-particles{z-index:1}.craft-particles i{position:absolute;display:block;opacity:0}
-.bench-scrap{width:13px;height:16px;clip-path:polygon(0 0,100% 14%,78% 41%,100% 96%,12% 100%,25% 76%,0 63%);background:repeating-linear-gradient(118deg,var(--tone,#d6ba88) 0 3px,#655344 4px 5px);border:1px solid #4b3930}
+.bench-scrap{width:13px;height:16px;margin:-8px 0 0 -6.5px;clip-path:polygon(0 0,100% 14%,78% 41%,100% 96%,12% 100%,25% 76%,0 63%);background:repeating-linear-gradient(118deg,var(--tone,#d6ba88) 0 3px,#655344 4px 5px);border:1px solid #4b3930}
 .bench-spark{width:13px;height:3px;border-radius:50%;background:#ffc66d;box-shadow:0 0 8px #ff923f;transform-origin:left center}
 .craft-item{z-index:3;display:grid;justify-items:center;gap:4px;min-width:112px;padding:9px 10px;transform:translate(-50%,-53%);border:1px solid #94734d;border-radius:9px;background:#211a15f5;color:#ffe5b0;box-shadow:0 0 28px #ffc97163;animation:craft-item-in .26s ease-out}
 @keyframes craft-item-in{from{opacity:0;transform:translate(-50%,-49%) scale(.86)}}
@@ -314,13 +316,14 @@ nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria
 .craft-quantity input[aria-invalid=true]{border-color:#efa38f}
 .boost-status{background:var(--iron);border-color:#837964;color:#e8d8b8}
 
-/* Timber work surface and front edge, with the materials on the wood. */
+/* Top-down workshop: tools stay at the edges of the timber surface. */
 .craft-overlay{background:#080807db}
-.craft-overlay .craft-bench{height:min(68dvh,268px)}
-.craft-bench{--worktop:polygon(12% 0,88% 0,100% 100%,0 100%);border:0;background:none;box-shadow:none;overflow:visible}
-.bench-furniture{position:absolute;inset:0;pointer-events:none;filter:drop-shadow(0 12px 9px #000b)}
-.bench-furniture::before{content:'';position:absolute;inset:24% 0 18%;clip-path:var(--worktop);background:radial-gradient(ellipse at 50% 40%,#a06a3538,transparent 70%),repeating-linear-gradient(0deg,#0e0a07 0 2px,#a77d4d44 2px 3px,transparent 3px 22px),repeating-linear-gradient(1deg,#aa804019 0 1px,transparent 1px 5px),linear-gradient(#30251b,#513923 62%,#37281a);box-shadow:inset 0 0 20px #080605a0}
-.bench-furniture::after{content:'';position:absolute;inset:82% 0 8%;border:1px solid #705233;border-bottom:3px solid #110c08;background:repeating-linear-gradient(1deg,#0003 0 1px,transparent 1px 4px),linear-gradient(#3b291a,#21160e);border-radius:0 0 4px 4px}
+.bench-tools{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;filter:drop-shadow(1px 2px 2px #140b06)}
+.craft-stack{position:absolute;z-index:1;top:50%;left:50%;width:46px;height:69px;margin:-34.5px 0 0 -23px;opacity:0}
+.craft-stack i{position:absolute;inset:0;border:1px solid #ad8759;border-radius:4px;background:#302821 url('/art/GrimDeck_card_back.webp') center / 106% auto no-repeat;box-shadow:0 2px 4px #22130a;transform:translate(-4px,3px) rotate(-12deg)}
+.craft-stack i:nth-child(2){transform:translate(3px,2px) rotate(8deg)}
+.craft-stack i:nth-child(3){transform:rotate(-2deg)}
+.bench-dust{width:5px;height:4px;margin:-2px 0 0 -2.5px;border-radius:50%;background:radial-gradient(ellipse at top,#fff0b1,#bf8550 78%);box-shadow:0 1px 2px #3a1f11}
 .craft-hammer{filter:drop-shadow(3px 5px 3px #090c10)}
 .craft-impact{z-index:1;inset:calc(50% - 39px) 7% auto;height:78px;background:radial-gradient(ellipse at center,#fff7d6 1%,#ffcb87 9%,#ee8c4555 25%,transparent 64%);}
 .craft-impact::before,.craft-impact::after{content:'';position:absolute;inset:18% 12%;border-radius:50%;border:1px solid #ffcf8d;box-shadow:0 0 13px #f7804670,inset 0 0 10px #f7a25b70}

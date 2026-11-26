@@ -368,14 +368,14 @@ async function route(){
  if(returning)detailTriggers(id,returning.id)[returning.index]?.focus({preventScroll:true});
 }
 function table(prefix){
- return {face:$(`${prefix}face`),holder:$(`${prefix}card`),stage:$(`${prefix}stage`),label:$(`${prefix}newCardPanel`)};
+ return {face:$(`${prefix}face`),holder:$(`${prefix}card`),stage:$(`${prefix}stage`),label:$(`${prefix}newCardPanel`),rarity:$(`${prefix}drawRarity`)};
 }
-function resetTable({face,holder,stage,label}){
+function resetTable({face,holder,stage,label,rarity}){
  stage.closest('section').classList.remove('draw-resumed');
  face.hidden=true;face.inert=true;face.replaceChildren();face.removeAttribute('data-r');
- label.hidden=true;stage.removeAttribute('data-r');holder.classList.remove('open');
+ label.hidden=true;rarity.textContent='';rarity.parentElement.classList.remove('shown');stage.removeAttribute('data-r');holder.classList.remove('open');
 }
-async function flip(entry,{face,holder,stage,label},pane){
+async function flip(entry,{face,holder,stage,label,rarity},pane){
  // Mount the inert face before turning; backface culling hides it until the edge.
  paint(face,entry.id,true);face.setAttribute('aria-hidden','true');face.hidden=false;
  await waitForFrame(face.querySelector('.card-frame'));
@@ -383,8 +383,11 @@ async function flip(entry,{face,holder,stage,label},pane){
  const visible=()=>!$(pane).hidden&&targetPane()===pane;
  const expose=()=>{
   if(exposed)return;
-  exposed=true;stage.dataset.r=entry.id[4];
-  if(visible())DrawSound.reveal(entry.id[4]);
+  const r=entry.id[4];
+  exposed=true;stage.dataset.r=r;
+  rarity.textContent=`Выпала ${rarities[r][0].toLowerCase()}`;
+  label.hidden=!entry.new;rarity.parentElement.classList.add('shown');
+  if(visible())DrawSound.reveal(r);
  };
  try{
   if(!motion.matches&&visible()&&holder.animate){
@@ -401,7 +404,7 @@ async function flip(entry,{face,holder,stage,label},pane){
   }
  }finally{
   stopScene=null;cancelAnimationFrame(frame);holder.classList.add('open');turn?.cancel();stage.classList.remove('turning');
-  expose();face.removeAttribute('aria-hidden');face.inert=false;label.hidden=!entry.new;
+  expose();face.removeAttribute('aria-hidden');face.inert=false;
  }
 }
 async function reveal(out){
@@ -409,7 +412,6 @@ async function reveal(out){
  if(list.length===1){
   const [entry]=list;
   await flip(entry,table(''),'home');
-  say(entry.new?'':`Повтор: ${cards.get(entry.id)[1]}`);
   return;
  }
  const featured=list.reduce((best,{id},i)=>rarityRank.get(id[4])<rarityRank.get(list[best].id[4])?i:best,0);
@@ -509,7 +511,7 @@ async function shuffleDeck(){
 async function craftAtBench(id,quantity){
  const recipe=craftRecipes[id], title=craftTitle(recipe,quantity);
  const onBench=()=>targetPane()==='tool-craft'&&!$('tool-craft').hidden;
- const overlay=$('craftOverlay'), table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), air=$('craftParticles'), item=$('craftItem');
+ const overlay=$('craftOverlay'), table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), stack=$('craftStack'), air=$('craftParticles'), item=$('craftItem');
  const receipt=recipeRows.find(row=>row.id===id)?.receipt;
  const confirm=()=>{if(receipt)receipt.textContent=`Создано: ${title}`;};
  if(!onBench()){confirm();say(`Создано: ${title}`);return;}
@@ -526,11 +528,34 @@ async function craftAtBench(id,quantity){
  try{
   const dust=recipe.material==='dust';
   const at=(ms,frame)=>({...frame,offset:ms/duration});
+  const pose=(x,y,angle,scale=1)=>`translate(${x}px,${y}px) rotate(${angle}deg) scale(${scale})`;
   if(dust){
-   const bagFrames=[at(0,{opacity:0,transform:'translate(-24px,-45px) rotate(-16deg)'}),at(395,{opacity:1,transform:'translateY(0)'}),at(470,{opacity:1,transform:'scale(1.05,.93)'}),at(540,{opacity:1,transform:'none'})];
-   for(const ms of strikes)bagFrames.push(at(ms,{opacity:1,transform:'none'}),at(ms+46,{opacity:1,transform:'scale(1.11,.77)'}),at(ms+115,{opacity:1,transform:'none'}));
-   bagFrames.push(at(duration,{opacity:0,transform:'scale(.9,.86)'}));
-   animate(bag,bagFrames,{duration,fill:'both'});
+   const pour=pose(-58,-49,115);
+   animate(bag,[at(0,{opacity:0,transform:pose(-125,-32,-12)}),at(165,{opacity:1,transform:pose(-65,-45,-6)}),at(310,{opacity:1,transform:pour}),at(555,{opacity:1,transform:pour}),at(735,{opacity:0,transform:pose(-128,-35,38)}),at(duration,{opacity:0})],{duration,fill:'both'});
+   for(let i=0;i<26;i++){
+    const grain=node('i',undefined,'bench-dust');air.append(grain);
+    const start=320+8*i, theta=i*2.4, ring=.24+(i%7)*.12;
+    const x=Math.cos(theta)*21*ring, y=Math.sin(theta)*11*ring;
+    const frames=[at(0,{opacity:0}),at(start,{opacity:0,transform:pose(-40,-40,0)}),at(start+16,{opacity:1,transform:pose(-36,-35,15)}),at(start+145,{opacity:1,transform:pose(x,y,i*35)})];
+    for(const [idx,ms] of strikes.entries()){
+     const f=1-idx*.24;
+     frames.push(at(ms,{opacity:1,transform:pose(x*f,y*f,i*35)}),at(ms+55,{opacity:1,transform:pose(x*(f+.3),y*f-7-i%6,i*51)}),at(ms+135,{opacity:idx===2?0:1,transform:pose(x*(f-.24),y*(f-.24),i*35,idx===2?.2:1)}));
+    }
+    frames.push(at(duration,{opacity:0}));animate(grain,frames,{duration,fill:'both'});
+   }
+  }else{
+   const first=strikes[0];
+   animate(stack,[at(0,{opacity:0,transform:pose(-140,0,-8)}),at(155,{opacity:1,transform:pose(-95,0,-8)}),at(455,{opacity:1,transform:pose(0,0,0),easing:'ease-out'}),at(first,{opacity:1,transform:pose(0,0,0)}),at(first+70,{opacity:0,transform:pose(0,0,0,.65)}),at(duration,{opacity:0})],{duration,fill:'both'});
+   for(let i=0;i<14;i++){
+    const bit=node('i',undefined,'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
+    const theta=i*2.4, x=Math.cos(theta)*(24+i%6*6), y=Math.sin(theta)*(12+i%5*5);
+    const frames=[at(0,{opacity:0}),at(first,{opacity:0,transform:pose(0,0,i*32,.65)}),at(first+52,{opacity:1,transform:pose(x*.86,y*.75-10,i*64)}),at(first+145,{opacity:1,transform:pose(x,y,i*72)})];
+    for(const [idx,ms] of strikes.entries())if(idx){
+     const f=idx===1?1:.55;
+     frames.push(at(ms,{opacity:1,transform:pose(x*f,y*f,i*72)}),at(ms+56,{opacity:1,transform:pose(x*f*.8,y*f-10,i*72+19)}),at(ms+145,{opacity:idx===2?0:1,transform:pose(x*(f-.45),y*(f-.45),i*72,idx===2?.2:1)}));
+    }
+    frames.push(at(duration,{opacity:0}));animate(bit,frames,{duration,fill:'both'});
+   }
   }
   const rest='translate(66px,15px) rotate(-49deg)', raised='translate(62px,-32px) rotate(-60deg)', hit='translate(34px,-4px) rotate(-96deg)';
   const motionFrames=[at(0,{transform:rest})];
@@ -546,18 +571,6 @@ async function craftAtBench(id,quantity){
    animate(table,[{transform:'translateY(0)'},{offset:.12,transform:'translateY(2px)'},{offset:.32,transform:'translateY(-1px)'},{transform:'translateY(0)'}],{duration:145,delay:ms});
   }
   const spread=Math.min(102,table.clientWidth*.31);
-  for(let i=0;!dust&&i<14;i++){
-   const bit=node('i',undefined,'bench-scrap');bit.dataset.r=recipe.material;air.append(bit);
-   const theta=i*2.4, x=Math.cos(theta)*spread*(.36+(i%8)*.09), y=Math.sin(theta)*(12+i%6*4)+13;
-   const pose=(x,y,turn,scale=1)=>`translate(${x}px,${y}px) rotate(${turn}deg) scale(${scale})`;
-   const start=90+i*8;
-   const frames=[at(0,{opacity:0}),at(start,{opacity:0,transform:pose(0,-73,i*33)}),at(start+45,{opacity:1}),at(start+230,{opacity:1,transform:pose(x,y,i*72)})];
-   for(const [idx,ms] of strikes.entries()){
-    const f=1-idx/3, next=f-1/3;
-    frames.push(at(ms,{transform:pose(x*f,y*f,i*72),opacity:1}),at(ms+55,{transform:pose(x*(f+next)/2,y*f-10,i*72+19),opacity:1}),at(ms+150,{transform:pose(x*next,y*next,i*72,idx===2?.2:1),opacity:idx===2?0:1}));
-   }
-   frames.push(at(duration,{opacity:0}));animate(bit,frames,{duration,fill:'both'});
-  }
   for(const [idx,ms] of strikes.entries())for(let i=0;i<18;i++){
    const ember=i>=12, spark=node('i',undefined,ember?'bench-ember':'bench-spark');air.append(spark);
    const theta=ember?(i-12+.4)*Math.PI/6:(i+.35)*Math.PI/12;
