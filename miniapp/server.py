@@ -18,7 +18,7 @@ FILES = {'/': ('index.html', 'text/html; charset=utf-8'), '/game.js': ('game.js'
 CARD = 'WIT_C01'
 
 
-def player_id(raw, token, allowed):
+def signed_player(raw, token, allowed):
     if not isinstance(raw, str):
         raise ValueError()
     pairs = parse_qsl(raw, keep_blank_values=True, strict_parsing=True, max_num_fields=32)
@@ -32,10 +32,14 @@ def player_id(raw, token, allowed):
         raise ValueError()
     if not -30 <= time.time() - int(fields['auth_date']) <= 600:
         raise ValueError()
-    user = json.loads(fields['user'])['id']
-    if type(user) is not int or user not in allowed:
+    user = json.loads(fields['user'])
+    if not isinstance(user, dict) or type(user.get('id')) is not int or user['id'] not in allowed:
         raise ValueError()
     return user
+
+
+def player_id(raw, token, allowed):
+    return signed_player(raw, token, allowed)['id']
 
 
 def init_db(path):

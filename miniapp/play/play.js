@@ -642,7 +642,7 @@ async function transact(kind,size,quantity=1,params){
  busy=true;refresh();
  const op=pending;
  if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
- DrawSound.prepareQuest();
+ if(op.kind!=='edit-profile')DrawSound.prepareQuest();
  if(op.kind==='break'||op.kind==='craft'||huntActions.has(op.kind))DrawSound.unlock();
  if(op.kind==='break'){hideShuffleReveal();$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('');
@@ -653,9 +653,9 @@ async function transact(kind,size,quantity=1,params){
   const prior=state.fight;
   accept(out);
   pending=null;remember();
-  if(op.kind!=='strike')HuntUI.showRewards(out.questRewards);
+  if(op.kind!=='strike'&&op.kind!=='edit-profile')HuntUI.showRewards(out.questRewards);
   if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior);
-  else if(op.kind==='edit-profile'){say('Профиль сохранён.');if(targetPane()==='profile')void SeasonUI.open('profile',{keep:true});}
+  else if(op.kind==='edit-profile'){SeasonUI.saved(out.profileIdentity);say('Профиль сохранён.');}
   else if(op.kind==='draw')await reveal(out);
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
   else if(op.kind==='activate-boost')say(`Активировано: ${boostInfo[out.activated][0]}`);

@@ -37,7 +37,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
-from server import Handler, ThreadingHTTPServer, SimpleCookie, CookieError, player_id
+from server import Handler, ThreadingHTTPServer, SimpleCookie, CookieError, signed_player
 
 WEB = Path(__file__).resolve().parent / 'play'
 ROOT = WEB.parents[1]
@@ -104,11 +104,15 @@ def standings(db, now, key_for, me, include, requested=None):
     season, ends = seasons.calendar(now)
     baseline = first_season(db)
     rows = []
+    telegram_avatar = None
     for uid, saved in execute(db, 'SELECT uid,state FROM players'):
         if not include(uid):
             continue
         state = json.loads(saved)
-        rows.append(seasons.profile(state, key_for(uid), CARDS, seasons.current(state, season, baseline)))
+        key = key_for(uid)
+        rows.append(seasons.profile(state, key, CARDS, seasons.current(state, season, baseline), mine=key == me))
+        if requested and key == me:
+            telegram_avatar = state.get('telegramProfile', {}).get('avatar')
     rows.sort(key=lambda row: (-row['influence'], row['id']))
     for rank, row in enumerate(rows, 1):
         row['rank'] = rank
@@ -118,7 +122,8 @@ def standings(db, now, key_for, me, include, requested=None):
             return 404, {'error': 'Профиль не найден'}
         if row['id'] == me:
             # No premium entitlement source exists in the current build.
-            row.update(mine=True, premiumUntil=None, avatars=avatars(), frames=seasons.FRAMES)
+            row.update(mine=True, premiumUntil=None, avatars=avatars(), frames=seasons.FRAMES,
+                       telegramAvatar=telegram_avatar)
         return 200, row
     fields = ('id', 'name', 'avatar', 'frame', 'universe', 'influence', 'rank')
     return 200, dict(season=season, endsAt=ends, rules=[seasons.SPIN_INFLUENCE, seasons.TASK_INFLUENCE,
@@ -134,7 +139,7 @@ def refill_free_spins(state, now):
         state['freeNextAt'] = 0 if state['freeSpins'] == MAX_FREE_SPINS else next_at + earned * FREE_INTERVAL
 
 
-def play(db, uid, kind, data, bonus, now=None):
+def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
     # Take the season timestamp under the lock, not while the request is waiting.
     if postgres(db):
         execute(db, 'SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', (uid,))
@@ -148,6 +153,12 @@ def play(db, uid, kind, data, bonus, now=None):
     state = json.loads(row[0]) if row else dict(freeSpins=MAX_FREE_SPINS, freeNextAt=0, spins=0, coins=bonus, dust=0, lastBreak=0, owned={})
     needs_save = not row or state.get('season') != season or 'freeSpins' not in state
     seasons.roll(state, season, baseline)
+    if telegram_defaults is not None and telegram_defaults != state.get('telegramProfile', {}):
+        if telegram_defaults:
+            state['telegramProfile'] = telegram_defaults
+        else:
+            state.pop('telegramProfile', None)
+        needs_save = True
     state.setdefault('spins', 0)
     state.setdefault('influence', 0)
     state.setdefault('contractsCompleted', 0)
@@ -220,7 +231,7 @@ def play(db, uid, kind, data, bonus, now=None):
         return 409, {'error': 'Начался новый сезон. Повтори действие после обновления'}
     owned = state['owned']
     if kind == 'edit-profile':
-        error = seasons.edit(state, params, avatars())
+        error = seasons.edit(state, params, avatars)
         if error:
             return 400, {'error': error}
         result = dict(profileParams=params)
@@ -395,7 +406,10 @@ class Play(Handler):
             with closing(connect(self.server.db)) as db, db:
                 row=execute(db,'SELECT uid FROM play_sessions WHERE digest=? AND expires>?',(digest,now)).fetchone()
                 if kind=='session':
-                    if secure: uid='tg:'+str(player_id(data.get('initData'),self.server.token,self.server.allowed))
+                    if secure:
+                        user = signed_player(data.get('initData'), self.server.token, self.server.allowed)
+                        uid = 'tg:' + str(user['id'])
+                        play(db, uid, 'state', {}, 3, telegram_defaults=seasons.telegram_identity(user))
                     elif row: return self.response(200,{'player':self.player_key(row[0])})
                     else: uid='local:'+secrets.token_hex(16)
                     sid=secrets.token_urlsafe(32); ttl=3600 if secure else 30*DAY
@@ -418,8 +432,11 @@ class Play(Handler):
                                             include, data.get('id'))
                     return self.response(status, out)
                 status,out=play(db,uid,kind,data,3 if secure else 120)
-                if kind=='state' and status==200:
-                    out['canGrantSpins']=True
+                if status == 200:
+                    if kind == 'state':
+                        out['canGrantSpins'] = True
+                    elif kind == 'edit-profile':
+                        out['profileIdentity'] = seasons.identity(out['state'], self.player_key(uid), mine=True)
                 self.response(status,out)
         except (KeyError, ValueError, TypeError, CookieError): self.response(401,{'error':'Не удалось войти'})
         except DB_ERRORS: self.response(503,{'error':'Сохранение временно недоступно'})

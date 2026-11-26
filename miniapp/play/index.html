@@ -84,7 +84,14 @@ const grimBoot=(()=>{
 })();
 </script>
 <main inert><header class="game-header">
- <div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><a href="#profile" aria-label="Мой профиль">Профиль</a><button id="sound" type="button">Звук</button></div></div>
+ <svg width="0" height="0" aria-hidden="true" class="game-symbols"><defs>
+ <symbol id="sigil-influence" viewBox="0 0 32 32">
+  <circle cx="16" cy="16" r="14" fill="#261e30" stroke="#a18ab7"/>
+  <path d="M16 7v16m-6 0h12M8 12h16M8 12l-4 7h8l-4-7Zm16 0-4 7h8l-4-7Z" fill="none" stroke="#e7d2ff" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
+ </symbol>
+ <symbol id="nav-arrow" viewBox="0 0 24 24"><path d="M20 12H4m0 0 6-6m-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</defs></svg>
+<div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><a class="profile-link" href="#profile" aria-label="Мой профиль"><span>Профиль</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a><button id="sound" type="button">Звук</button></div></div>
  <dl class="wallet" aria-label="Баланс">
   <div><dt title="Крутки"><span class="wallet-label">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
    <rect x="8" y="5" width="14" height="21" rx="2" transform="rotate(-22 15 15)" fill="#333b3b" stroke="#8e9fa1"/>
@@ -106,7 +113,7 @@ const grimBoot=(()=>{
    <path d="m9 12 3 2 4-5 4 5 3-2-2 7H11Zm2 9h10" fill="#965b28" stroke="#613813" stroke-linecap="round" stroke-linejoin="round"/>
    <path d="m10 12.7 2.2 1.7 3.8-4.6 3.8 4.6 2.2-1.7M12 18h8" fill="none" stroke="#ffe1a0" stroke-width=".8" stroke-linecap="round"/>
   </svg></dt><dd id="coins">—</dd></div>
-  <div><dt title="Влияние"><span class="wallet-label">Влияние</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 16 16 30 3 16Z" fill="#24202c" stroke="#af93c7"/><path d="M16 6l2.8 7.2L26 16l-7.2 2.8L16 26l-2.8-7.2L6 16l7.2-2.8Z" fill="#9c76bd" stroke="#e5d1ff"/><circle cx="16" cy="16" r="2" fill="#fff1ff"/></svg></dt><dd id="influence">—</dd></div>
+  <div><dt title="Влияние"><span class="wallet-label">Влияние</span><svg class="influence-icon wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg></dt><dd id="influence">—</dd></div>
  </dl>
 </header><div id="questToast" role="status" aria-atomic="true"></div><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
  <div class="deck-plaque">
@@ -216,8 +223,14 @@ const grimBoot=(()=>{
   <button id="strike" class="primary hunt-wide" type="button" disabled>Ударить</button>
  </section>
  <section id="tool-rank" class="deck-tool season-view" aria-labelledby="topTitle" hidden>
- <a class="deck-back" href="#home">← Колода</a>
- <div class="season-hero"><p class="season-kicker">ЛЕТОПИСЬ КОНТИНЕНТА</p><h1 id="topTitle">Топ сезона</h1><p id="topSeason"></p><a href="#profile" class="hunt-link">Мой профиль →</a></div>
+ <a class="deck-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span>Колода</span></a>
+ <div class="season-hero"><h1 id="topTitle">Топ сезона</h1>
+  <div id="topSeason" class="season-period" hidden>
+   <div><span>Текущий сезон</span><strong id="topMonth"></strong></div>
+   <div><span>Окончание сезона</span><time id="topDeadline"><strong id="topEndDate"></strong><b id="topEndTime"></b></time></div>
+  </div>
+  <a href="#profile" class="profile-link season-profile-link"><span>Мой профиль</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
+ </div>
  <p id="topStatus" role="status"></p><ol id="topRows" class="season-rows"></ol>
 </section>
 <section id="glory" class="deck-tool season-view" aria-labelledby="gloryTitle" hidden>
@@ -226,15 +239,15 @@ const grimBoot=(()=>{
  <div class="season-panel"><h2>Награды сезона</h2><p>Крутки получат только игроки на призовых местах арены: 1-е, 2–3-е, 4–5-е и 6–10-е. Влияние на награды не влияет.</p></div>
 </section>
 <section id="profile" class="deck-tool season-view" aria-labelledby="profileTitle" hidden>
- <a id="profileBack" class="deck-back" href="#tool-rank">← Топ</a>
+ <a id="profileBack" class="deck-back" href="#tool-rank"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span>Топ</span></a>
  <p id="profileStatus" role="status"></p>
  <div id="profileContent" hidden>
   <div class="season-hero profile-hero">
    <div id="profilePortrait"></div><p id="profileRank" class="season-kicker"></p><h1 id="profileTitle"></h1><p id="profileUniverse"></p>
   </div>
   <div id="profileEditor" class="season-panel" hidden></div>
-  <div class="season-panel influence-panel"><h2>Влияние</h2><strong id="profileInfluence"></strong></div>
-  <dl id="profileStats" class="season-panel profile-stats"></dl>
+  <div class="season-panel influence-panel"><h2><svg class="influence-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg>Влияние</h2><strong id="profileInfluence"></strong></div>
+  <section class="season-panel profile-stat-panel" aria-labelledby="profileStatsTitle"><h2 id="profileStatsTitle">Статистика</h2><dl id="profileStats" class="profile-stats"></dl></section>
   <div id="profileAchievements" class="season-panel"><h2>Достижения</h2><ul id="profileMedals"></ul></div>
  </div>
 </section>

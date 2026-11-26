@@ -7,9 +7,11 @@ from pathlib import Path
 from http.client import HTTPConnection
 from threading import Thread
 import hashlib
+import hmac
 import json
 import time
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import play_server as game
 
@@ -471,6 +473,81 @@ class FullGame(unittest.TestCase):
             finally:
                 server.shutdown()
                 worker.join()
+
+    def test_signed_telegram_defaults_and_durable_custom_profile(self):
+        token = 'fixture-token'
+        photo = 'https://t.me/i/userpic/320/grimdeck-fixture.jpg'
+        user = dict(id=1, first_name='  Анна ', last_name='Волкова', username='fixture', photo_url=photo,
+                    language_code='ru')
+        def sign(telegram_user):
+            fields = dict(auth_date=str(int(time.time())), user=json.dumps(telegram_user))
+            check = '\n'.join(f'{k}={v}' for k, v in sorted(fields.items())).encode()
+            secret = hmac.digest(b'WebAppData', token.encode(), 'sha256')
+            return urlencode(dict(fields, hash=hmac.digest(secret, check, 'sha256').hex()))
+
+        with game.ThreadingHTTPServer(('127.0.0.1', 0), game.Play) as server:
+            server.db, server.telegram, server.token, server.allowed = self.path, True, token, {1, 2}
+            server.origin = 'https://game.example.invalid'
+            self.addCleanup(server.shutdown)
+            Thread(target=server.serve_forever, daemon=True).start()
+            def request(path, payload=None, cookie=''):
+                with closing(HTTPConnection(*server.server_address, timeout=3)) as conn:
+                    conn.request('GET' if payload is None else 'POST', '/api/'+path,
+                                 None if payload is None else json.dumps(payload),
+                                 {'Origin':server.origin,'Content-Type':'application/json','Cookie':cookie})
+                    res = conn.getresponse()
+                    return res.status, json.loads(res.read()), (res.getheader('Set-Cookie') or '').split(';')[0]
+
+            valid = sign(user)
+            self.assertEqual(request('session', dict(initData=valid.replace('fixture', 'edited')))[0], 401)
+            self.assertEqual(request('session', dict(initData=valid.split('&hash=')[0]))[0], 401)
+            self.assertEqual(request('session', dict(initData=sign(dict(user, id=3))))[0], 401)
+            status, session, cookie = request('session', dict(initData=valid))
+            self.assertEqual((status, set(session)), (200, {'player'}))
+            status, own, _ = request('profile/me', cookie=cookie)
+            self.assertEqual((status, own['name'], own['avatar'], own['telegramAvatar']), (200, 'Анна Волкова', photo, photo))
+            top = request('top', cookie=cookie)[1]
+            self.assertEqual((top['rows'][0]['name'], top['rows'][0]['avatar']), ('Анна Волкова', photo))
+            defaults = request('state', cookie=cookie)[1]['state']['telegramProfile']
+            self.assertEqual(defaults, dict(name='Анна Волкова', avatar=photo))
+            _, _, other_cookie = request('session', dict(initData=sign(dict(id=2))))
+            other_own = request('profile/me', cookie=other_cookie)[1]
+            self.assertTrue(other_own['name'].startswith('Искатель '))
+            self.assertEqual(other_own['avatar'], 'wolf')
+            other_view = request('profile/'+session['player'], cookie=other_cookie)[1]
+            self.assertTrue(other_view['name'].startswith('Искатель '))
+            self.assertEqual(other_view['avatar'], 'wolf')
+            self.assertNotIn('telegramAvatar', other_view)
+            other_top = request('top', cookie=other_cookie)[1]
+            self.assertNotIn('Анна Волкова', str(other_top))
+            self.assertNotIn(photo, str(other_top))
+            for index, params in enumerate([dict(name='Белый Волк'), dict(avatar='moon'), dict(frame='steel')]):
+                payload = dict(op=f'fixture-profile-{index:03}', size=0, **params)
+                status, out, _ = request('edit-profile', payload, cookie)
+                self.assertEqual(status, 200)
+                self.assertEqual({key: out['profileIdentity'][key] for key in params}, params)
+                self.assertEqual(request('edit-profile', payload, cookie)[1]['profileIdentity'], out['profileIdentity'])
+            _, _, cookie = request('session', dict(initData=sign(dict(user, first_name='Трисс'))))
+            own = request('profile/me', cookie=cookie)[1]
+            self.assertEqual((own['name'], own['avatar'], own['frame']), ('Белый Волк', 'moon', 'steel'))
+            other_view = request('profile/'+session['player'], cookie=other_cookie)[1]
+            self.assertEqual((other_view['name'], other_view['avatar'], other_view['frame']), ('Белый Волк', 'moon', 'steel'))
+            reset = request('edit-profile', dict(op='fixture-profile-reset', size=0, avatar='telegram'), cookie)
+            self.assertEqual((reset[0], reset[1]['profileIdentity']['avatar']), (200, photo))
+            _, _, cookie = request('session', dict(initData=sign(dict(user, photo_url='https://t.me.example.invalid/i/userpic/x'))))
+            own = request('profile/me', cookie=cookie)[1]
+            self.assertEqual((own['name'], own['avatar'], own['telegramAvatar']), ('Белый Волк', 'wolf', None))
+
+    def test_telegram_identity_optional_fields_and_photo_rules(self):
+        normalize = game.seasons.telegram_identity
+        self.assertEqual(normalize(dict(id=1)), {})
+        self.assertEqual(normalize(dict(first_name='  ', username='player_1')), {'name':'player_1'})
+        url = 'https://cdn4.telegram-cdn.org/file/grimdeck-fixture.png'
+        self.assertEqual(normalize(dict(photo_url=url)), {'avatar':url})
+        for bad in ('http://t.me/i/userpic/320/x', 'https://t.me/i/userpic/../x', 'https://t.me:443/i/userpic/x',
+                    'https://t.me@other.invalid/i/userpic/x', 'https://t.me/i/userpic/x#fragment', 'https://t.me/somebody'):
+            with self.subTest(bad=bad):
+                self.assertEqual(normalize(dict(photo_url=bad)), {})
 
     def test_profile_permissions_and_idempotent_edit(self):
         self.seed(influence=99)
