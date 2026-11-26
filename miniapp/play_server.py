@@ -9,6 +9,7 @@ import sqlite3
 import time
 
 import hunts
+import seasons
 
 try:
     import psycopg
@@ -72,18 +73,57 @@ BOOST_USES = {7: 10, 8: 4}
 DRAW_THRESHOLDS = (34, 61, 82, 98, 100)
 BOOSTED_DRAW_THRESHOLDS = (25, 52, 73, 97, 100)
 ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), 'craft': tuple(CRAFT_RECIPES),
-                'activate-boost': tuple(BOOST_USES), **TEST_ACTIONS, **dict.fromkeys(hunts.ACTIONS, (0,))}
+                'activate-boost': tuple(BOOST_USES), 'edit-profile': (0,),
+                **TEST_ACTIONS, **dict.fromkeys(hunts.ACTIONS, (0,))}
 
 
-def schema(db):
+def schema(db, *, now=None):
     statements = '''CREATE TABLE IF NOT EXISTS play_sessions (digest TEXT PRIMARY KEY, uid TEXT, expires INTEGER);
         CREATE TABLE IF NOT EXISTS players (uid TEXT PRIMARY KEY, state TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS operations (uid TEXT, op TEXT, kind TEXT, size INTEGER, result TEXT,
-        PRIMARY KEY(uid,op));'''
+        PRIMARY KEY(uid,op));
+        CREATE TABLE IF NOT EXISTS season_config (id INTEGER PRIMARY KEY, baseline TEXT NOT NULL);'''
     for statement in statements.split(';'):
         if statement.strip():
             db.execute(statement)
+    baseline, _ = seasons.calendar(int(time.time()) if now is None else now)
+    # Legacy players belong to the launch season even if they don't log in before rollover.
+    execute(db, 'INSERT INTO season_config VALUES (1,?) ON CONFLICT(id) DO NOTHING', (baseline,))
     db.commit()
+
+
+def first_season(db):
+    return execute(db, 'SELECT baseline FROM season_config WHERE id=1').fetchone()[0]
+
+
+def avatars():
+    return (*seasons.SIGILS, *(cid for cid in CARDS if (WEB/'art'/f'{cid}.webp').is_file()))
+
+
+def standings(db, now, key_for, me, include, requested=None):
+    season, ends = seasons.calendar(now)
+    baseline = first_season(db)
+    rows = []
+    for uid, saved in execute(db, 'SELECT uid,state FROM players'):
+        if not include(uid):
+            continue
+        state = json.loads(saved)
+        rows.append(seasons.profile(state, key_for(uid), CARDS, seasons.current(state, season, baseline)))
+    rows.sort(key=lambda row: (-row['influence'], row['id']))
+    for rank, row in enumerate(rows, 1):
+        row['rank'] = rank
+    if requested:
+        row = next((row for row in rows if row['id'] == (me if requested == 'me' else requested)), None)
+        if not row:
+            return 404, {'error': 'Профиль не найден'}
+        if row['id'] == me:
+            # No premium entitlement source exists in the current build.
+            row.update(mine=True, premiumUntil=None, avatars=avatars(), frames=seasons.FRAMES)
+        return 200, row
+    fields = ('id', 'name', 'avatar', 'frame', 'universe', 'influence', 'rank')
+    return 200, dict(season=season, endsAt=ends, rules=[seasons.SPIN_INFLUENCE, seasons.TASK_INFLUENCE,
+                                                        seasons.CONTRACT_INFLUENCE],
+                     rows=[{key: row[key] for key in fields} for row in rows], me=me)
 
 
 def refill_free_spins(state, now):
@@ -94,21 +134,33 @@ def refill_free_spins(state, now):
         state['freeNextAt'] = 0 if state['freeSpins'] == MAX_FREE_SPINS else next_at + earned * FREE_INTERVAL
 
 
-def play(db, uid, kind, data, bonus, now):
-    # Serialize mutations and the one-time migration of legacy balances.
+def play(db, uid, kind, data, bonus, now=None):
+    # Take the season timestamp under the lock, not while the request is waiting.
     if postgres(db):
         execute(db, 'SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', (uid,))
     else:
         db.execute('BEGIN IMMEDIATE')
+    if now is None:
+        now = int(time.time())
+    season, ends = seasons.calendar(now)
+    baseline = first_season(db)
     row = execute(db,'SELECT state FROM players WHERE uid=?',(uid,)).fetchone()
     state = json.loads(row[0]) if row else dict(freeSpins=MAX_FREE_SPINS, freeNextAt=0, spins=0, coins=bonus, dust=0, lastBreak=0, owned={})
+    needs_save = not row or state.get('season') != season or 'freeSpins' not in state
+    seasons.roll(state, season, baseline)
     state.setdefault('spins', 0)
+    state.setdefault('influence', 0)
+    state.setdefault('contractsCompleted', 0)
+
+    def save():
+        execute(db, 'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',
+                (uid, json.dumps(state)))
     if 'freeSpins' not in state:
         day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
         used = state.pop('used', 0)
         free = MAX_FREE_SPINS - used if state.pop('day', None) == day else MAX_FREE_SPINS
         state.update(freeSpins=free, freeNextAt=now + FREE_INTERVAL if free < MAX_FREE_SPINS else 0)
-        execute(db,'UPDATE players SET state=? WHERE uid=?',(json.dumps(state),uid))
+    seasons.unlock(state, CARDS)
     refill_free_spins(state, now)
     utc_day = now // DAY
     shuffles = state.get('shuffleCount', 0) if state.get('shuffleDay') == utc_day else 0
@@ -121,7 +173,8 @@ def play(db, uid, kind, data, bonus, now):
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
                                         weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES,
-                    maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')))
+                    maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')),
+                    seasonEndsAt=ends)
 
     def spend_boost(boost, units):
         left = active.get(boost, 0)
@@ -133,6 +186,9 @@ def play(db, uid, kind, data, bonus, now):
         return used
 
     if kind == 'state':
+        if needs_save:
+            save()
+        db.commit()
         return 200, reply()
     op, size = data.get('op'), data.get('size', 0)
     if not isinstance(op,str) or not re.fullmatch(r'[a-zA-Z0-9-]{16,64}',op):
@@ -143,6 +199,8 @@ def play(db, uid, kind, data, bonus, now):
     if type(quantity) is not int or not 1 <= quantity <= (MAX_CRAFT_BATCH if kind == 'craft' else 1):
         return 400, {'error': 'Некорректное количество'}
     params = {hunts.ACTIONS[kind]: data.get(hunts.ACTIONS[kind])} if kind in hunts.ACTIONS else {}
+    if kind == 'edit-profile':
+        params = {key: data[key] for key in ('name', 'avatar', 'frame') if key in data}
     if kind == 'strike':
         params['contract'] = data.get('contract')
         if type(params['turn']) is not int:
@@ -151,11 +209,22 @@ def play(db, uid, kind, data, bonus, now):
     if old:
         # Legacy craft results describe a single recipe execution.
         result = json.loads(old[2])
-        if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity or result.get('huntParams', {}) != params:
+        old_season = result.pop('receiptSeason', baseline)
+        old_params = result.get('profileParams', result.get('huntParams', {}))
+        if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity or old_params != params:
             return 409, {'error':'Операция уже использована'}
+        if old_season != season:
+            return 409, {'error': 'Операция уже завершена в прошлом сезоне'}
         return 200, {**reply(),**result}
+    if data.get('season', season) != season:
+        return 409, {'error': 'Начался новый сезон. Повтори действие после обновления'}
     owned = state['owned']
-    if kind in hunts.ACTIONS:
+    if kind == 'edit-profile':
+        error = seasons.edit(state, params, avatars())
+        if error:
+            return 400, {'error': error}
+        result = dict(profileParams=params)
+    elif kind in hunts.ACTIONS:
         status, result = hunts.action(state, CARDS, kind, params)
         if status != 200:
             return status, result
@@ -257,10 +326,18 @@ def play(db, uid, kind, data, bonus, now):
             result['rewardCard'] = dict(id=cid, new=not qty)
         shuffles += 1
         state.update(dust=state['dust']+gain, lastBreak=now, shuffleDay=utc_day, shuffleCount=shuffles)
+    if kind == 'draw':
+        state['influence'] += size * seasons.SPIN_INFLUENCE
     if kind in ('draw', 'craft', 'break'):
         result['questRewards'] = hunts.progress(state, kind, size if kind == 'draw' else quantity)
-    execute(db,'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',(uid,json.dumps(state)))
-    execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',(uid,op,kind,size,json.dumps(result)))
+        state['influence'] += len(result['questRewards']) * seasons.TASK_INFLUENCE
+    if kind == 'strike' and result.get('questRewards'):
+        state['contractsCompleted'] += 1
+        state['influence'] += seasons.CONTRACT_INFLUENCE
+    seasons.unlock(state, CARDS)
+    save()
+    execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',
+            (uid,op,kind,size,json.dumps({**result, 'receiptSeason': season})))
     db.commit()
     return 200, {**reply(),**result}
 
@@ -276,6 +353,7 @@ class Play(Handler):
         path=urlsplit(self.path).path
         files={'/':(WEB/'index.html','text/html; charset=utf-8'),'/play.css':(WEB/'play.css','text/css'),'/play.js':(WEB/'play.js','text/javascript'),'/draw-sound.js':(ROOT/'draw-sound.js','text/javascript'),'/cards.js':(ROOT/'cards.js','text/javascript')}
         files['/hunt.js'] = (WEB/'hunt.js', 'text/javascript')
+        files['/season.js'] = (WEB/'season.js', 'text/javascript')
         if path == '/quest-complete.mp3':
             sound = WEB/'the_witcher_3_quests_completed_sound.mp3'
             if sound.is_file(): return self.send(200, sound.read_bytes(), 'audio/mpeg')
@@ -292,6 +370,9 @@ class Play(Handler):
             if file.is_file(): return self.send(200,file.read_bytes(),'image/webp')
         if path=='/api/art': return self.response(200,[cid for cid in CARDS if (WEB/'art'/f'{cid}.webp').is_file()])
         if path=='/api/state': return self.api('state',{})
+        if path=='/api/top': return self.api('top',{})
+        if re.fullmatch(r'/api/profile/(?:me|[0-9a-f]{24})', path):
+            return self.api('profile', {'id': path.rsplit('/', 1)[1]})
         self.response(404,{})
 
     def do_POST(self):
@@ -326,7 +407,17 @@ class Play(Handler):
                     return self.response(401,{'error':'Открой игру заново, чтобы войти'})
                 # Only a current allowlisted Telegram session (or the loopback demo)
                 # reaches play(), so grants always affect that tester's own account.
-                status,out=play(db,row[0],kind,data,3 if secure else 120,now)
+                uid = row[0]
+                if kind in ('top', 'profile'):
+                    def include(other):
+                        return (other.startswith('tg:') and int(other[3:]) in self.server.allowed
+                                if secure else other.startswith('local:'))
+                    if data.get('id') == 'me':
+                        play(db, uid, 'state', {}, 3 if secure else 120)
+                    status, out = standings(db, int(time.time()), self.player_key, self.player_key(uid),
+                                            include, data.get('id'))
+                    return self.response(status, out)
+                status,out=play(db,uid,kind,data,3 if secure else 120)
                 if kind=='state' and status==200:
                     out['canGrantSpins']=True
                 self.response(status,out)

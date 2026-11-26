@@ -20,7 +20,7 @@ class FullGame(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.path = Path(folder.name)/'play.sqlite3'
         with closing(sqlite3.connect(self.path)) as db:
-            game.schema(db)
+            game.schema(db, now=100000)
 
     def run_play(self, kind, n=1, size=0, *, uid='A', now=100000, coins=7, **params):
         with closing(sqlite3.connect(self.path)) as db, db:
@@ -213,7 +213,7 @@ class FullGame(unittest.TestCase):
     def seed(self, **fields):
         state = {**self.run_play('state')[1]['state'], **fields}
         with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('INSERT INTO players VALUES (?,?)', ('A', json.dumps(state)))
+            db.execute('UPDATE players SET state=? WHERE uid=?', (json.dumps(state), 'A'))
 
     def test_craft_recipes_spend_materials_and_preserve_last_copies(self):
         owned = {'WIT_C01': 7, 'WIT_C02': 5, 'WIT_C03': 1, 'WIT_R01': 11,
@@ -393,6 +393,115 @@ class FullGame(unittest.TestCase):
         _, last = self.run_play('strike', 3, contract=contract['id'], turn=1)
         self.assertEqual(last['strike']['events'][-1]['slot'], 0)
 
+    def test_season_boundary_resets_only_seasonal_state_and_fences_retries(self):
+        before = game.seasons.calendar(100000)[1] - 1
+        after = before + 1
+        self.seed(owned={'WIT_C01': 2}, dust=44, coins=8, spins=13, rewardSpins=3,
+                  boostInventory={'draw': 2}, activeBoosts={'shuffle': 3},
+                  profile={'name': 'Ночной охотник', 'frame': 'ivy'}, earnedFrames=['ivy'],
+                  contractsCompleted=5, deck=['WIT_C01']+[None]*5)
+        _, draw = self.run_play('draw', 90, 1, now=before)
+        self.assertGreater(draw['state']['influence'], 0)
+        self.assertTrue(draw['state']['owned'])
+        for step, op in enumerate((90, 91), 1):
+            self.assertEqual(self.run_play('draw', op, 1, now=after, season='1970-01')[0], 409, step)
+        def fetch(_):
+            return self.run_play('state', now=after)[1]['state']
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            rolled = list(pool.map(fetch, range(3)))
+        for state in rolled:
+            self.assertEqual((state['season'], state['owned'], state['influence']), ('1970-02', {}, 0))
+            self.assertNotIn('deck', state)
+            self.assertNotIn('contract', state)
+            self.assertNotIn('fight', state)
+            for key in ('coins','dust','spins','rewardSpins','boostInventory','activeBoosts',
+                        'profile','earnedFrames','contractsCompleted'):
+                self.assertEqual(state[key], draw['state'][key])
+        self.assertEqual(self.run_play('draw', 92, 1, now=after, season='1970-02')[1]['state']['influence'] >= 1, True)
+        self.assertEqual(self.run_play('draw', 90, 1, now=after)[0], 409)
+
+    def test_inactive_legacy_players_roll_in_public_projection_at_midnight(self):
+        legacy = dict(freeSpins=5, freeNextAt=0, coins=42, dust=2, lastBreak=0,
+                      owned={'WIT_C01':3}, influence=30, profile={'name':'Искатель'})
+        end = game.seasons.calendar(100000)[1]
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO players VALUES (?,?)', ('B', json.dumps(legacy)))
+            project = lambda now: game.standings(db, now, lambda uid: uid.lower(), 'a', lambda uid: True)[1]
+            self.assertEqual(project(end-1)['rows'][0]['influence'], 30)
+            self.assertEqual(project(end)['rows'][0]['influence'], 0)
+            public = game.standings(db, end, str.lower, 'a', lambda uid: True, 'b')[1]
+            self.assertEqual((public['cards'], public['name']), (0, 'Искатель'))
+            self.assertEqual(set(public) & {'coins','owned','premiumUntil','state','uid'}, set())
+        state = self.run_play('state', uid='B', now=end)[1]['state']
+        self.assertEqual((state['coins'], state['owned'], state['influence']), (42, {}, 0))
+
+    def test_rank_order_and_authenticated_public_profile(self):
+        now = int(time.time())
+        self.run_play('draw', size=10, uid='tg:1', now=now)
+        self.run_play('state', uid='tg:2', now=now)
+        self.run_play('draw', size=10, uid='tg:3', now=now)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            for sid, uid in [('first', 'tg:1'), ('second', 'tg:2'), ('removed', 'tg:3')]:
+                db.execute('INSERT INTO play_sessions VALUES (?,?,?)',
+                           (hashlib.sha256(sid.encode()).hexdigest(), uid, now+60))
+        with game.ThreadingHTTPServer(('127.0.0.1', 0), game.Play) as server:
+            server.db, server.telegram, server.token, server.allowed = self.path, True, 'fake-token', {1, 2}
+            worker = Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            def get(path, sid=''):
+                with closing(HTTPConnection(*server.server_address, timeout=3)) as conn:
+                    conn.request('GET', path, headers={'Cookie':f'__Host-grim-play={sid}'})
+                    res = conn.getresponse()
+                    return res.status, json.loads(res.read())
+            try:
+                self.assertEqual(get('/api/top')[0], 401)
+                self.assertEqual(get('/api/top', 'removed')[0], 401)
+                status, top = get('/api/top', 'second')
+                rows = top['rows']
+                self.assertEqual((status, len(rows), [p['rank'] for p in rows]), (200, 2, [1, 2]))
+                self.assertGreaterEqual(rows[0]['influence'], 10)
+                self.assertEqual((rows[1]['influence'], rows[1]['id']), (0, top['me']))
+                self.assertEqual(set(rows[0]), {'id','rank','name','avatar','frame','universe','influence'})
+                status, other = get('/api/profile/'+rows[0]['id'], 'second')
+                self.assertEqual((status, other['rank'], other['arenaWins']), (200, 1, 0))
+                self.assertFalse(set(other) & {'mine','premiumUntil','coins','owned','uid','avatars'})
+                status, own = get('/api/profile/me', 'second')
+                self.assertEqual((status, own['id'], own['mine'], own['premiumUntil']), (200, top['me'], True, None))
+                self.assertEqual(get('/api/profile/'+'0'*24, 'second')[0], 404)
+            finally:
+                server.shutdown()
+                worker.join()
+
+    def test_profile_permissions_and_idempotent_edit(self):
+        self.seed(influence=99)
+        self.assertEqual(self.run_play('edit-profile', name='x')[0], 400)
+        self.assertEqual(self.run_play('edit-profile', avatar='https://example.invalid/avatar.png')[0], 400)
+        self.assertEqual(self.run_play('edit-profile', frame='eclipse')[0], 400)
+        self.assertEqual(self.run_play('edit-profile', frame='ember')[0], 400)
+        self.assertEqual(self.run_play('draw', 2, 1)[0], 200)
+        status, out = self.run_play('edit-profile', frame='ember')
+        self.assertEqual((status, out['state']['profile']['frame']), (200, 'ember'))
+        self.assertEqual(self.run_play('edit-profile', frame='ember'), (status, out))
+        self.assertEqual(self.run_play('edit-profile', frame='steel')[0], 409)
+        status, out = self.run_play('edit-profile', 3, name='  Белый   Волк  ')
+        self.assertEqual((status, out['state']['profile']['name']), (200, 'Белый Волк'))
+        status, out = self.run_play('edit-profile', 4, avatar='moon')
+        self.assertEqual((status, out['state']['profile']['avatar']), (200, 'moon'))
+        self.assertNotIn('profile', self.run_play('state', uid='B')[1]['state'])
+
+    def test_contract_influence_only_for_victory_and_once(self):
+        contract = dict(id='hunt-fixture', name='Грифон', tier=2, reward=4)
+        fight = dict(id=contract['id'], turn=0, status='active', monster={**contract,'hp':1,'atk':2},
+                     units=[dict(id='WIT_C01', atk=1, hp=1)]+[None]*5)
+        self.seed(contract=contract, fight=fight)
+        status, out = self.run_play('strike', contract=contract['id'], turn=0)
+        self.assertEqual((status, out['state']['influence'], out['state']['contractsCompleted']), (200, 10, 1))
+        self.assertEqual(self.run_play('strike', contract=contract['id'], turn=0), (status, out))
+        self.assertEqual(self.run_play('strike', 2, contract=contract['id'], turn=0)[0], 409)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            profile = game.standings(db, 100000, str.lower, 'other', lambda uid: True, 'a')[1]
+        self.assertEqual((profile['arenaWins'], profile['contracts']), (0, 1))
+
     def test_batches_and_multiple_daily_rewards_once(self):
         board = dict(day=1, resetsAt=2*game.DAY-game.hunts.MOSCOW, notices=[
             dict(id='a', kind='craft', goal=1, progress=0, reward=2),
@@ -404,11 +513,17 @@ class FullGame(unittest.TestCase):
         status, out = self.run_play('craft', 1, 1, quantity=4)
         self.assertEqual((status, out['state']['coins'], out['questRewards']),
                          (200, 12, [dict(id='a', coins=2), dict(id='b', coins=3)]))
+        self.assertEqual(out['state']['influence'], 10)
         self.assertEqual(self.run_play('craft', 1, 1, quantity=4), (status, out))
-        self.assertEqual(self.run_play('craft', 2, 1)[1]['questRewards'], [])
-        self.assertEqual(self.run_play('draw', 3, 10)[1]['questRewards'], [dict(id='c', coins=4)])
-        self.assertEqual(self.run_play('break', 4)[1]['questRewards'], [])
-        self.assertEqual(self.run_play('break', 5, now=107200)[1]['questRewards'], [dict(id='d', coins=2)])
+        craft = self.run_play('craft', 2, 1)[1]
+        self.assertEqual((craft['questRewards'], craft['state']['influence']), ([], 10))
+        draw = self.run_play('draw', 3, 10)[1]
+        self.assertEqual((draw['questRewards'], draw['state']['influence']), ([dict(id='c', coins=4)], 25))
+        first_shuffle = self.run_play('break', 4)[1]
+        self.assertEqual((first_shuffle['questRewards'], first_shuffle['state']['influence']), ([], 25))
+        second_shuffle = self.run_play('break', 5, now=107200)[1]
+        self.assertEqual((second_shuffle['questRewards'], second_shuffle['state']['influence']),
+                         ([dict(id='d', coins=2)], 30))
         self.assertEqual(self.run_play('state', now=107200)[1]['state']['coins'], 18)
 
     def test_hunt_validation_snapshot_parallel_strike_and_reward(self):

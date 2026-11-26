@@ -403,3 +403,59 @@ nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria
 nav a span{white-space:nowrap;letter-spacing:0}
 @media(max-width:430px){nav{gap:5px}nav a{flex-direction:column;gap:3px;font-size:13px;padding-inline:2px}nav a svg{width:15px;height:15px}}
 @media(prefers-reduced-motion:reduce){#questToast.shown,.hunt-impact{animation:none}}
+
+/* The season ledger: graphite plates with enamel and silver fittings. */
+.wallet{grid-template-columns:repeat(4,minmax(0,1fr))}
+.wallet div:last-child{background:linear-gradient(148deg,#312638,#1c1920)}
+#influence{color:#e7d2ff}
+.header-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.header-actions a{color:#eee2ce;font-size:.8rem;text-decoration:none;padding:9px 6px}
+.season-view{--ledger-line:#57514a;--ledger-muted:#c1b7a9;--ledger-accent:#e7ce9b;--ledger-score:#e4caff}
+.season-launch{display:block;margin:12px 0}
+.season-hero,.season-panel{border:1px solid var(--ledger-line);border-radius:10px;background:linear-gradient(145deg,#292a2b,#171819);padding:15px;margin:0 0 12px}
+.season-hero{background:radial-gradient(ellipse at 50% -20%,#464038,transparent 74%),#1d1e20;text-align:center;box-shadow:inset 0 0 0 3px #18191a,0 4px 14px #0006}
+.season-kicker{color:var(--ledger-accent);font-size:.68rem;font-weight:800;letter-spacing:.14em;margin:4px 0 8px}
+.season-hero h1{margin:0 0 8px;overflow-wrap:anywhere}
+.season-hero p:not(.season-kicker),.season-panel p,#topStatus,#profileStatus{color:var(--ledger-muted);font-size:.89rem;line-height:1.45}
+.season-panel h2{font-size:1rem;margin:0 0 8px}
+.season-rows{list-style:none;padding:0;margin:0;display:grid;gap:7px}
+.season-row{display:grid;grid-template-columns:2.1em auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px;border:1px solid var(--ledger-line);border-radius:8px;background:#252628;color:#f3eadd;text-decoration:none}
+.season-place{font-size:.76rem;color:var(--ledger-muted);text-align:center;font-weight:700}
+.season-place[data-podium="1"]{color:#ffe19b}.season-place[data-podium="2"]{color:#d1e0e9}.season-place[data-podium="3"]{color:#f0b18d}
+.season-identity,.season-identity b,.season-identity small{display:block;min-width:0;overflow-wrap:anywhere}
+.season-identity small,.cosmetic-tile small{color:var(--ledger-muted);font-size:.73rem;font-weight:500}
+.season-score,.influence-panel strong{color:var(--ledger-score);font-variant-numeric:tabular-nums}
+.season-score{font-size:.85rem;max-width:5.3em;text-align:right;overflow-wrap:anywhere}
+.season-portrait{--rim:#92939a;--rim-shadow:#3d3f43;--rim-dark:#25262a;display:inline-grid;position:relative;isolation:isolate;place-items:center;width:44px;aspect-ratio:1;border-radius:50%;padding:4px;background:conic-gradient(from -55deg,var(--rim-shadow),var(--rim),var(--rim-shadow),var(--rim),var(--rim-shadow));box-shadow:0 0 0 1px var(--rim-dark),0 2px 5px #000b;vertical-align:middle}
+.season-face{display:grid;place-items:center;position:relative;overflow:hidden;width:100%;height:100%;border:1px solid #181719;border-radius:50%;background:radial-gradient(ellipse at 45% 35%,#474142,#201c23 80%);color:#ffe4b1;font-family:Georgia,serif}
+.season-face img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 29%}
+.season-portrait[data-frame="copper"]{--rim:#d99466;--rim-shadow:#634030}
+.season-portrait[data-frame="steel"]{--rim:#dfe6ef;--rim-shadow:#626d82}
+.season-portrait:is([data-frame="ember"],[data-frame="ivy"],[data-frame="frost"],[data-frame="blood"],[data-frame="regal"],[data-frame="eclipse"]){padding:6px;box-shadow:inset 0 0 0 1px var(--rim),inset 0 0 0 3px var(--rim-dark),0 0 7px var(--rim-shadow)}
+.season-portrait:is([data-frame="ember"],[data-frame="ivy"],[data-frame="frost"],[data-frame="blood"],[data-frame="regal"],[data-frame="eclipse"])::after{content:'✦';position:absolute;bottom:-.42em;left:50%;transform:translateX(-50%);color:var(--rim);text-shadow:0 1px 2px #000,0 0 4px var(--rim-shadow);line-height:1}
+.season-portrait[data-frame="ember"]{--rim:#ffce86;--rim-shadow:#c55225}
+.season-portrait[data-frame="ivy"]{--rim:#dbedad;--rim-shadow:#4f8445}
+.season-portrait[data-frame="frost"]{--rim:#d4fcff;--rim-shadow:#519aca}
+.season-portrait[data-frame="blood"]{--rim:#ff91a7;--rim-shadow:#9b2042}
+.season-portrait[data-frame="regal"]{--rim:#ffe99c;--rim-shadow:#bd8120}
+.season-portrait[data-frame="eclipse"]{--rim:#f3c2ff;--rim-shadow:#8351ce}
+.season-portrait:is([data-frame="regal"],[data-frame="eclipse"])::before{content:'◆';position:absolute;top:-.55em;left:50%;transform:translateX(-50%);color:var(--rim);text-shadow:-14px 9px var(--rim-shadow),14px 9px var(--rim-shadow),0 0 6px var(--rim);line-height:1}
+.profile-hero .season-portrait{width:94px;padding:8px;font-size:2rem}
+.portrait-button{border:0;background:transparent;padding:8px;box-shadow:none}
+.rename-button{display:block;margin:8px auto 0;font-size:.75rem}
+.influence-panel{display:flex;justify-content:space-between;align-items:center;border-color:#746084;gap:10px}
+.influence-panel h2{margin:0}.influence-panel strong{font-size:1.3rem;overflow-wrap:anywhere}
+.profile-stats{display:grid;gap:8px}.profile-stats div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.profile-stats dt{color:var(--ledger-muted);font-size:.85rem}.profile-stats dd{margin:0;text-align:right;font-weight:700;font-size:.85rem}
+#profileMedals{margin:0;padding-left:18px;color:var(--ledger-muted);font-size:.85rem}
+#profileEditor button:not(.cosmetic-tile){margin:4px 4px 4px 0}
+#profileEditor input{display:block;width:100%;margin:5px 0;padding:10px;border:1px solid var(--ledger-line);border-radius:5px;background:#151617;color:#f6efe3;font:inherit}
+.cosmetic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin:9px 0;max-height:300px;overflow:auto;padding:5px}
+.cosmetic-tile{display:grid;place-items:center;gap:7px;padding:9px 4px;font-size:.75rem;overflow-wrap:anywhere}
+.cosmetic-tile[aria-pressed="true"]{border-color:#dfc38b;color:#ffebbc}
+.cosmetic-tile:disabled{opacity:.78}
+.season-face img.avatar-medallion{object-fit:contain;padding:10%}
+.season-portrait[data-frame="ember"]::before{content:'';position:absolute;inset:0;border-radius:inherit;background:repeating-conic-gradient(from 11deg,transparent 0deg 20deg,#ffdd9d 21deg 23deg,transparent 24deg 36deg);z-index:-1}
+.season-portrait[data-frame="ivy"]::before{content:'';position:absolute;inset:-2px;border-radius:inherit;border:3px double #9bb36a;transform:rotate(25deg) scaleX(.92)}
+.season-portrait[data-frame="frost"]::before{content:'❄';position:absolute;top:-.48em;color:#d7fbff;line-height:1;text-shadow:0 0 4px #74caef}
+.season-portrait[data-frame="blood"]::before{content:'';position:absolute;inset:1px;border-radius:inherit;border:2px dotted #ffb4b6;box-shadow:0 0 3px #ef526b}

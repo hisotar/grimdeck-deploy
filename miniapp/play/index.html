@@ -25,7 +25,7 @@ main[inert]{visibility:hidden;pointer-events:none}
 </style>
 <link id="gameStyle" rel="stylesheet" href="/play.css" media="print" fetchpriority="high" onload="this.media='all'" onerror="this.dataset.failed='true'">
 <link rel="preload" as="image" href="/art/card-frame.webp" type="image/webp"><link rel="preload" as="image" href="/art/GrimDeck_card_back.webp" type="image/webp">
-<script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/hunt.js"></script><script defer src="/play.js"></script>
+<script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/hunt.js"></script><script defer src="/season.js"></script><script defer src="/play.js"></script>
 </head><body data-mode="telegram">
 <div id="startup" data-phase="loading">
  <div class="startup-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -84,7 +84,7 @@ const grimBoot=(()=>{
 })();
 </script>
 <main inert><header class="game-header">
- <div class="game-brand"><b>✦ GRIMDECK</b><button id="sound" type="button">Звук</button></div>
+ <div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><a href="#profile" aria-label="Мой профиль">Профиль</a><button id="sound" type="button">Звук</button></div></div>
  <dl class="wallet" aria-label="Баланс">
   <div><dt title="Крутки"><span class="wallet-label">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
    <rect x="8" y="5" width="14" height="21" rx="2" transform="rotate(-22 15 15)" fill="#333b3b" stroke="#8e9fa1"/>
@@ -106,6 +106,7 @@ const grimBoot=(()=>{
    <path d="m9 12 3 2 4-5 4 5 3-2-2 7H11Zm2 9h10" fill="#965b28" stroke="#613813" stroke-linecap="round" stroke-linejoin="round"/>
    <path d="m10 12.7 2.2 1.7 3.8-4.6 3.8 4.6 2.2-1.7M12 18h8" fill="none" stroke="#ffe1a0" stroke-width=".8" stroke-linecap="round"/>
   </svg></dt><dd id="coins">—</dd></div>
+  <div><dt title="Влияние"><span class="wallet-label">Влияние</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 16 16 30 3 16Z" fill="#24202c" stroke="#af93c7"/><path d="M16 6l2.8 7.2L26 16l-7.2 2.8L16 26l-2.8-7.2L6 16l7.2-2.8Z" fill="#9c76bd" stroke="#e5d1ff"/><circle cx="16" cy="16" r="2" fill="#fff1ff"/></svg></dt><dd id="influence">—</dd></div>
  </dl>
 </header><div id="questToast" role="status" aria-atomic="true"></div><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
  <div class="deck-plaque">
@@ -205,6 +206,7 @@ const grimBoot=(()=>{
   <div id="battleDeck" class="battle-table"></div>
   <div class="hunt-actions"><button id="autoDeck" type="button" disabled>Автосбор</button><button id="resetDeck" type="button" disabled>Сброс</button></div>
   <button class="hunt-wide" type="button" disabled>Бой в PvP</button><p class="hunt-note">Арена откроется в одном из следующих обновлений.</p>
+  <a class="hunt-link season-launch" href="#glory">✦ Слава · рейтинг арены →</a>
   <div id="battleContract" class="battle-contract"></div>
  </section>
  <section id="hunt" class="deck-tool" aria-label="Охота" hidden>
@@ -213,8 +215,29 @@ const grimBoot=(()=>{
   <div id="huntOutcome" role="status" aria-atomic="true"></div>
   <button id="strike" class="primary hunt-wide" type="button" disabled>Ударить</button>
  </section>
- <section id="tool-rank" class="deck-tool" aria-label="Топ" hidden>
-  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Топ</h1></section>
+ <section id="tool-rank" class="deck-tool season-view" aria-labelledby="topTitle" hidden>
+ <a class="deck-back" href="#home">← Колода</a>
+ <div class="season-hero"><p class="season-kicker">ЛЕТОПИСЬ КОНТИНЕНТА</p><h1 id="topTitle">Топ сезона</h1><p id="topSeason"></p><a href="#profile" class="hunt-link">Мой профиль →</a></div>
+ <p id="topStatus" role="status"></p><ol id="topRows" class="season-rows"></ol>
+</section>
+<section id="glory" class="deck-tool season-view" aria-labelledby="gloryTitle" hidden>
+ <a class="deck-back" href="#battle">← Бой</a>
+ <div class="season-hero"><p class="season-kicker">АРЕНА · СЕЗОННЫЙ РЕЙТИНГ</p><h1 id="gloryTitle">Слава</h1><p>Арена пока закрыта. Здесь появятся места после первых PvP-боёв.</p></div>
+ <div class="season-panel"><h2>Награды сезона</h2><p>Крутки получат только игроки на призовых местах арены: 1-е, 2–3-е, 4–5-е и 6–10-е. Влияние на награды не влияет.</p></div>
+</section>
+<section id="profile" class="deck-tool season-view" aria-labelledby="profileTitle" hidden>
+ <a id="profileBack" class="deck-back" href="#tool-rank">← Топ</a>
+ <p id="profileStatus" role="status"></p>
+ <div id="profileContent" hidden>
+  <div class="season-hero profile-hero">
+   <div id="profilePortrait"></div><p id="profileRank" class="season-kicker"></p><h1 id="profileTitle"></h1><p id="profileUniverse"></p>
+  </div>
+  <div id="profileEditor" class="season-panel" hidden></div>
+  <div class="season-panel influence-panel"><h2>Влияние</h2><strong id="profileInfluence"></strong></div>
+  <dl id="profileStats" class="season-panel profile-stats"></dl>
+  <div id="profileAchievements" class="season-panel"><h2>Достижения</h2><ul id="profileMedals"></ul></div>
+ </div>
+</section>
 <section id="album" hidden><h1>Коллекция</h1><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="pack-face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="pack-drawRarity"></span><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
 <section id="detail" class="card-view" aria-labelledby="detailTitle" hidden>
  <div id="detailArt" class="card-view-art"></div>

@@ -22,7 +22,7 @@ async function waitForFrame(image){
  finally{clearTimeout(timer);}
 }
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
-let shuffleMastery, craftRecipes, huntTarget;
+let shuffleMastery, craftRecipes, huntTarget, seasonEndsAt;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -36,7 +36,16 @@ async function api(path,data,signal){
  return out;
 }
 function accept(out){
- state=out.state;huntTarget=out.huntTarget;offset=out.now-Math.floor(Date.now()/1000);
+ const seasonChanged=!!state&&state.season!==out.state.season;
+ state=out.state;seasonEndsAt=out.seasonEndsAt;huntTarget=out.huntTarget;
+ if(seasonChanged){
+  resetTable(table(''));resetTable(table('pack-'));
+  hasPack=false;$('packRest').hidden=true;$('packGrid').replaceChildren();
+  hideShuffleReveal();$('breakResult').hidden=true;
+  if(['#hunt','#pack','#detail'].includes(location.hash))history.replaceState(null,'','#home');
+  void route();
+ }
+ offset=out.now-Math.floor(Date.now()/1000);
  shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
  if(out.shuffleMastery)shuffleMastery=out.shuffleMastery;
  if(out.craftRecipes)craftRecipes=out.craftRecipes;
@@ -309,7 +318,7 @@ function refresh(){
  if(!state)return;
  const left=state.freeSpins, spins=state.spins??0, rewardSpins=state.rewardSpins??0, blocked=busy||!!pending;
  const total=left+spins+rewardSpins;
- $('totalSpins').textContent=total;$('coins').textContent=state.coins;$('dust').textContent=state.dust;
+ $('totalSpins').textContent=total;$('coins').textContent=state.coins;$('dust').textContent=state.dust;$('influence').textContent=state.influence??0;
  const freeMinutes=Math.ceil(Math.max(0,state.freeNextAt-clock())/60);
  $('free').textContent=`Бесплатные: ${left} из 5`;
  $('freeTimer').textContent=left===5?'Запас полный · +1 каждые 3 часа':freeMinutes?`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`:'Обновляем крутки…';
@@ -328,9 +337,9 @@ function refresh(){
  $('clearDust').disabled=blocked||!canGrantSpins||!state.dust;
  $('renewBoard').disabled=blocked||!canGrantSpins;
  refreshShuffle(blocked);refreshCraft(blocked);HuntUI.render(blocked);
- $('retry').hidden=!pending||busy;
+ $('retry').hidden=!pending||busy;SeasonUI.block(blocked);
 }
-const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack','detail','battle','hunt'];
+const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','profile','glory','pack','detail','battle','hunt'];
 const rarityRank=new Map(rarityGroups.map(([r],i)=>[r,i]));
 let activePane=null, activeDetail=null, transition=null, navigation=0, hasPack=false, stopScene=null;
 const main=document.querySelector('main'), pageStamp=crypto.randomUUID();
@@ -340,11 +349,12 @@ const returnFromDetail=()=>{if(targetPane()==='detail')history.back();};
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 function targetPane(){
  const id=location.hash.slice(1);
+ if(/^profile(?:\/[0-9a-f]{24})?$/.test(id))return 'profile';
  if(id==='detail')return history.state?.cardView?.stamp===pageStamp?'detail':'home';
  return panes.includes(id)&&(id!=='pack'||hasPack)?id:'home';
 }
 function go(id){
- if(location.hash!==`#${id}`)history.pushState(null,'',`#${id}`);
+ if(location.hash!==`#${id}`)history.pushState(id==='profile'?{profileFrom:targetPane()}:null,'',`#${id}`);
  return route();
 }
 async function route(){
@@ -372,8 +382,9 @@ async function route(){
   const frames=id==='detail'?[{opacity:0,transform:'translateY(14px) scale(.98)'},{opacity:1,transform:'none'}]:[{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}];
   transition=$(id).animate(frames,{duration:id==='detail'?240:165,easing:'ease-out'});
  }
- for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id==='hunt'?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
+ for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${['hunt','glory'].includes(id)?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
+ void SeasonUI.open(id);
  if(id==='hunt'&&!main.inert)HuntUI.resumed();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open&&!dustConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
@@ -626,7 +637,7 @@ const huntActions=new Set(['take-contract','save-deck','start-hunt','strike']);
 async function transact(kind,size,quantity=1,params){
  if(!state||busy)return;
  if(pending&&kind)return;
- if(!pending){pending={kind,op:crypto.randomUUID(),size,...(kind==='craft'?{quantity}:{}),...params};remember();}
+ if(!pending){pending={kind,op:crypto.randomUUID(),size,season:state.season,...(kind==='craft'?{quantity}:{}),...params};remember();}
  operationVersion++;
  busy=true;refresh();
  const op=pending;
@@ -644,6 +655,7 @@ async function transact(kind,size,quantity=1,params){
   pending=null;remember();
   if(op.kind!=='strike')HuntUI.showRewards(out.questRewards);
   if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior);
+  else if(op.kind==='edit-profile'){say('Профиль сохранён.');if(targetPane()==='profile')void SeasonUI.open('profile',{keep:true});}
   else if(op.kind==='draw')await reveal(out);
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
   else if(op.kind==='activate-boost')say(`Активировано: ${boostInfo[out.activated][0]}`);
@@ -690,9 +702,9 @@ main.addEventListener('click',e=>{
  e.preventDefault();go(link.hash.slice(1));
 });
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
-setInterval(()=>{if(!busy)refresh();if((state?.freeNextAt&&clock()>=state.freeNextAt)||state?.board?.resetsAt<=clock())sync();},5000);
+setInterval(()=>{if(!busy)refresh();if((state?.freeNextAt&&clock()>=state.freeNextAt)||state?.board?.resetsAt<=clock()||seasonEndsAt<=clock())sync();},5000);
 $('detailBack').onclick=returnFromDetail;
-tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(dustConfirm.open)dustConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(targetPane()==='hunt')go('battle');else if(targetPane()==='detail')returnFromDetail();else go('home');});
+tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(dustConfirm.open)dustConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(['hunt','glory'].includes(targetPane()))go('battle');else if(targetPane()==='profile')go($('profileBack').hash.slice(1));else if(targetPane()==='detail')returnFromDetail();else go('home');});
 HuntUI.bind();
 
 function gameStyleReady(signal){
