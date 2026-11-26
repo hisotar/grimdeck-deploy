@@ -1,7 +1,7 @@
 // Local foley: diffuse cardstock friction, then a short, dry contact transient.
 window.DrawSound = (() => {
  const key='grimdeck.draw.sound';
- let enabled=true, audio, paper, master;
+ let enabled=true, audio, paper, master, questBuffer;
  try { enabled=localStorage.getItem(key)!=='off'; } catch {}
  function toggle(){
   enabled=!enabled;
@@ -104,5 +104,23 @@ window.DrawSound = (() => {
    }
   } catch { /* Audio is optional. */ }
  }
- return {play,reveal,unlock,cue,toggle,get enabled(){return enabled;}};
+ function prepareQuest(){
+  if(!enabled||questBuffer)return;
+  questBuffer=(async()=>{
+   if(!await unlock())return null;
+   const response=await fetch('/quest-complete.mp3');
+   if(!response.ok)return null;
+   return audio.decodeAudioData(await response.arrayBuffer());
+  })().catch(()=>null).then(buffer=>{if(!buffer)questBuffer=null;return buffer;});
+ }
+ async function quest(){
+  if(!enabled||document.hidden)return;
+  const started=performance.now(), buffer=await questBuffer;
+  if(performance.now()-started>800||!buffer||!enabled||document.hidden||audio?.state!=='running')return;
+  try{
+   const source=audio.createBufferSource();source.buffer=buffer;source.connect(master);
+   source.onended=()=>source.disconnect();source.start();source.stop(audio.currentTime+3.2);
+  }catch{ /* A missing or blocked cue never affects a reward. */ }
+ }
+ return {prepareQuest,quest,play,reveal,unlock,cue,toggle,get enabled(){return enabled;}};
 })();

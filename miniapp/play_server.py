@@ -8,6 +8,8 @@ import secrets
 import sqlite3
 import time
 
+import hunts
+
 try:
     import psycopg
 except ImportError:  # The local SQLite demo has no external dependencies.
@@ -69,7 +71,7 @@ BOOST_USES = {7: 10, 8: 4}
 DRAW_THRESHOLDS = (34, 61, 82, 98, 100)
 BOOSTED_DRAW_THRESHOLDS = (25, 52, 73, 97, 100)
 ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), 'craft': tuple(CRAFT_RECIPES),
-                'activate-boost': tuple(BOOST_USES), **TEST_ACTIONS}
+                'activate-boost': tuple(BOOST_USES), **TEST_ACTIONS, **dict.fromkeys(hunts.ACTIONS, (0,))}
 
 
 def schema(db):
@@ -112,6 +114,7 @@ def play(db, uid, kind, data, bonus, now):
     state.setdefault('rewardSpins', 0)
     inventory = state.setdefault('boostInventory', {})
     active = state.setdefault('activeBoosts', {})
+    hunts.board_for(state, uid, now)
 
     def reply():
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
@@ -138,15 +141,25 @@ def play(db, uid, kind, data, bonus, now):
     quantity = data.get('quantity', 1)
     if type(quantity) is not int or not 1 <= quantity <= (MAX_CRAFT_BATCH if kind == 'craft' else 1):
         return 400, {'error': 'Некорректное количество'}
+    params = {hunts.ACTIONS[kind]: data.get(hunts.ACTIONS[kind])} if kind in hunts.ACTIONS else {}
+    if kind == 'strike':
+        params['contract'] = data.get('contract')
+        if type(params['turn']) is not int:
+            return 400, {'error': 'Некорректный номер хода'}
     old = execute(db,'SELECT kind,size,result FROM operations WHERE uid=? AND op=?',(uid,op)).fetchone()
     if old:
         # Legacy craft results describe a single recipe execution.
         result = json.loads(old[2])
-        if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity:
+        if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity or result.get('huntParams', {}) != params:
             return 409, {'error':'Операция уже использована'}
         return 200, {**reply(),**result}
     owned = state['owned']
-    if kind == 'draw':
+    if kind in hunts.ACTIONS:
+        status, result = hunts.action(state, CARDS, kind, params)
+        if status != 200:
+            return status, result
+        result['huntParams'] = params
+    elif kind == 'draw':
         free = min(size,state['freeSpins'])
         reward = min(size-free,state['rewardSpins'])
         extra = min(size-free-reward,state['spins'])
@@ -209,6 +222,7 @@ def play(db, uid, kind, data, bonus, now):
     elif kind == 'clear-collection':
         result = dict(removed=len(owned))
         state['owned'] = {}
+        state['deck'] = [None] * 6
     elif kind == 'reset-shuffle':
         state['lastBreak'] = 0
         result = {}
@@ -236,6 +250,8 @@ def play(db, uid, kind, data, bonus, now):
             result['rewardCard'] = dict(id=cid, new=not qty)
         shuffles += 1
         state.update(dust=state['dust']+gain, lastBreak=now, shuffleDay=utc_day, shuffleCount=shuffles)
+    if kind in ('draw', 'craft', 'break'):
+        result['questRewards'] = hunts.progress(state, kind, size if kind == 'draw' else quantity)
     execute(db,'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',(uid,json.dumps(state)))
     execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',(uid,op,kind,size,json.dumps(result)))
     db.commit()
@@ -252,6 +268,10 @@ class Play(Handler):
     def do_GET(self):
         path=urlsplit(self.path).path
         files={'/':(WEB/'index.html','text/html; charset=utf-8'),'/play.css':(WEB/'play.css','text/css'),'/play.js':(WEB/'play.js','text/javascript'),'/draw-sound.js':(ROOT/'draw-sound.js','text/javascript'),'/cards.js':(ROOT/'cards.js','text/javascript')}
+        files['/hunt.js'] = (WEB/'hunt.js', 'text/javascript')
+        if path == '/quest-complete.mp3':
+            sound = WEB/'the_witcher_3_quests_completed_sound.mp3'
+            if sound.is_file(): return self.send(200, sound.read_bytes(), 'audio/mpeg')
         if path in files:
             file,kind=files[path]; page=file.read_bytes()
             if path=='/' and not self.server.telegram:

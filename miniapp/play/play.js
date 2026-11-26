@@ -316,10 +316,10 @@ function refresh(){
  }
  $('clearCollection').disabled=blocked||!canGrantSpins||!Object.keys(state.owned).length;
  $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
- refreshShuffle(blocked);refreshCraft(blocked);
+ refreshShuffle(blocked);refreshCraft(blocked);HuntUI.render(blocked);
  $('retry').hidden=!pending||busy;
 }
-const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack','detail'];
+const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','pack','detail','battle','hunt'];
 const rarityRank=new Map(rarityGroups.map(([r],i)=>[r,i]));
 let activePane=null, activeDetail=null, transition=null, navigation=0, hasPack=false, stopScene=null;
 const main=document.querySelector('main'), pageStamp=crypto.randomUUID();
@@ -361,8 +361,9 @@ async function route(){
   const frames=id==='detail'?[{opacity:0,transform:'translateY(14px) scale(.98)'},{opacity:1,transform:'none'}]:[{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}];
   transition=$(id).animate(frames,{duration:id==='detail'?240:165,easing:'ease-out'});
  }
- for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
+ for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${id==='hunt'?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
+ if(id==='hunt')HuntUI.resumed();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo({top:returning?.top??0,behavior:'instant'});
@@ -610,23 +611,29 @@ async function sync(){
  catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...testerButtons,$('break')])b.disabled=true;say(e.message);}}
  finally{syncing=false;}
 }
-async function transact(kind,size,quantity=1){
+const huntActions=new Set(['take-contract','save-deck','start-hunt','strike']);
+async function transact(kind,size,quantity=1,params){
  if(!state||busy)return;
  if(pending&&kind)return;
- if(!pending){pending={kind,op:crypto.randomUUID(),size,...(kind==='craft'?{quantity}:{})};remember();}
+ if(!pending){pending={kind,op:crypto.randomUUID(),size,...(kind==='craft'?{quantity}:{}),...params};remember();}
  operationVersion++;
  busy=true;refresh();
  const op=pending;
  if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
- if(op.kind==='break'||op.kind==='craft')DrawSound.unlock();
+ DrawSound.prepareQuest();
+ if(op.kind==='break'||op.kind==='craft'||huntActions.has(op.kind))DrawSound.unlock();
  if(op.kind==='break'){hideShuffleReveal();$('breakResult').hidden=true;$('shuffleScene').removeAttribute('data-phase');}
  say('');
  let conflict=false;
  try{
-  const out=await api(op.kind,{op:op.op,size:op.size,...(op.kind==='craft'?{quantity:op.quantity??1}:{})});
+  const {kind:action,...payload}=op;
+  const out=await api(action,payload);
+  const prior=state.fight;
   accept(out);
   pending=null;remember();
-  if(op.kind==='draw')await reveal(out);
+  if(op.kind!=='strike')HuntUI.showRewards(out.questRewards);
+  if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior);
+  else if(op.kind==='draw')await reveal(out);
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
   else if(op.kind==='activate-boost')say(`Активировано: ${boostInfo[out.activated][0]}`);
   else if(op.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
@@ -668,9 +675,10 @@ main.addEventListener('click',e=>{
  e.preventDefault();go(link.hash.slice(1));
 });
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
-setInterval(()=>{if(!busy)refresh();if(state?.freeNextAt&&clock()>=state.freeNextAt)sync();},5000);
+setInterval(()=>{if(!busy)refresh();if((state?.freeNextAt&&clock()>=state.freeNextAt)||state?.board?.resetsAt<=clock())sync();},5000);
 $('detailBack').onclick=returnFromDetail;
-tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(targetPane()==='detail')returnFromDetail();else go('home');});
+tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(targetPane()==='hunt')go('battle');else if(targetPane()==='detail')returnFromDetail();else go('home');});
+HuntUI.bind();
 route();
 (async()=>{
  try{
@@ -679,7 +687,7 @@ route();
   key=`grimdeck.pending.${session.player}`;
   try{pending=JSON.parse(sessionStorage.getItem(key));}catch{}
   const [out,images]=await Promise.all([api('state'),api('art').catch(()=>[])]);
-  art=new Set(images);accept(out);refresh();if(!$('album').hidden)album();
+  art=new Set(images);accept(out);refresh();HuntUI.resumed();if(!$('album').hidden)album();
   say(pending?'Предыдущий запрос не завершён. Можно повторить.':local?'Локальный стенд · стартовый баланс 120 монет':'');
  }catch(e){say(e.message);}
 })();

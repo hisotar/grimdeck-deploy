@@ -1,4 +1,4 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="preload" as="image" href="/art/card-frame.webp" type="image/webp"><link rel="preload" as="image" href="/art/GrimDeck_card_back.webp" type="image/webp"><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header class="game-header">
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GrimDeck — Континент</title><link rel="preload" as="image" href="/art/card-frame.webp" type="image/webp"><link rel="preload" as="image" href="/art/GrimDeck_card_back.webp" type="image/webp"><link rel="stylesheet" href="/play.css"><script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/hunt.js"></script><script defer src="/play.js"></script></head><body data-mode="telegram"><main><header class="game-header">
  <div class="game-brand"><b>✦ GRIMDECK</b><button id="sound" type="button">Звук</button></div>
  <dl class="wallet" aria-label="Баланс">
   <div><dt title="Крутки"><span class="wallet-label">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -22,7 +22,7 @@
    <path d="m10 12.7 2.2 1.7 3.8-4.6 3.8 4.6 2.2-1.7M12 18h8" fill="none" stroke="#ffe1a0" stroke-width=".8" stroke-linecap="round"/>
   </svg></dt><dd id="coins">—</dd></div>
  </dl>
-</header><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
+</header><div id="questToast" role="status" aria-atomic="true"></div><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
  <div class="deck-plaque">
   <i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i>
   <img class="deck-emblem" src="/art/witcher-icon.png" width="72" height="72" alt="">
@@ -110,7 +110,24 @@
   <section class="craft-inventory" aria-labelledby="craftInventoryTitle"><h2 id="craftInventoryTitle">Инвентарь усилителей</h2><div id="craftInventory" class="craft-list"></div></section>
  </section>
  <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden>
-  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Задания</h1></section>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Доска объявлений</h1>
+  <p class="hunt-note">Новые объявления каждый день в 00:00 МСК</p>
+  <a id="questHunt" class="hunt-link" href="#battle" hidden>К охоте →</a>
+  <div id="questBoard" class="quest-board"></div>
+ </section>
+ <section id="battle" class="deck-tool" aria-labelledby="battleTitle" hidden>
+  <h1 id="battleTitle">Бой</h1>
+  <div id="battleDeck" class="battle-table"></div>
+  <div class="hunt-actions"><button id="autoDeck" type="button" disabled>Автосбор</button><button id="resetDeck" type="button" disabled>Сброс</button></div>
+  <button class="hunt-wide" type="button" disabled>Бой в PvP</button><p class="hunt-note">Арена откроется в одном из следующих обновлений.</p>
+  <div id="battleContract" class="battle-contract"></div>
+ </section>
+ <section id="hunt" class="deck-tool" aria-label="Охота" hidden>
+  <a class="deck-back" href="#battle">← Бой</a>
+  <div id="huntEnemy"></div><div id="huntDeck" class="battle-table"></div>
+  <div id="huntOutcome" role="status" aria-atomic="true"></div>
+  <button id="strike" class="primary hunt-wide" type="button" disabled>Ударить</button>
+ </section>
  <section id="tool-rank" class="deck-tool" aria-label="Топ" hidden>
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Топ</h1></section>
 <section id="album" hidden><h1>Коллекция</h1><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="pack-face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="pack-drawRarity"></span><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
@@ -124,4 +141,4 @@
  </div>
  <div class="card-view-actions"><button id="detailBack" type="button"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 7-7m-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Вернуться</span></button></div>
 </section>
-<nav aria-label="Разделы"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span>Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span>Коллекция</span></a></nav></main><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog></body></html>
+<nav aria-label="Разделы"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span>Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span>Коллекция</span></a><a href="#battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 3 .5L20 18m-4 2 4-4m-2 2 3 3M20 4l-3 .5L4 18m0-2 4 4m-2-2-3 3"/></svg><span>Бой</span></a></nav></main><dialog id="deckPicker" aria-labelledby="deckPickerTitle"><h2 id="deckPickerTitle">Выбор карты</h2><form method="dialog"><button value="cancel" autofocus>Закрыть</button></form><div id="deckChoices"></div></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog></body></html>

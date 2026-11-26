@@ -32,7 +32,7 @@ class FullGame(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(draw['newCount'], 1)
             self.assertEqual([c['new'] for c in draw['cards']], [True]+[False]*9)
-            self.assertEqual(draw['state']['coins'], 2)
+            self.assertEqual(draw['state']['coins'] - sum(q['coins'] for q in draw['questRewards']), 2)
             self.assertEqual(self.run_play('draw',size=10), (status, draw))
             self.assertEqual(self.run_play('draw',size=1)[0], 409)
             status, broken = self.run_play('break',2)
@@ -71,7 +71,8 @@ class FullGame(unittest.TestCase):
                 self.assertEqual(self.run_play('break', uid=uid), (status, out))
                 if bonus == 'spins':
                     _, draw = self.run_play('draw', 2, 10, uid=uid)
-                    self.assertEqual((draw['state']['freeSpins'], draw['state']['rewardSpins'], draw['state']['coins']), (0, 0, 5))
+                    self.assertEqual((draw['state']['freeSpins'], draw['state']['rewardSpins'],
+                                      draw['state']['coins'] - sum(q['coins'] for q in draw['questRewards'])), (0, 0, state['coins']-2))
 
     def test_legacy_shuffle_receipt_replays_without_new_rewards(self):
         card = 'WIT_M01'
@@ -109,7 +110,8 @@ class FullGame(unittest.TestCase):
         with patch.object(game.secrets,'randbelow',side_effect=[99,99,90,90]+[0]*7), patch.object(game.secrets,'choice',side_effect=['WIT_M01','WIT_M01','WIT_L01','WIT_L01']+['WIT_C01']*7):
             self.run_play('draw',1,1)
             _, draw=self.run_play('draw',2,10)
-            self.assertEqual((draw['featured'],draw['newCount'],draw['state']['coins']),(1,2,1))
+            self.assertEqual((draw['featured'],draw['newCount'],
+                              draw['state']['coins'] - sum(q['coins'] for q in draw['questRewards'])), (1,2,1))
             status,_=self.run_play('draw',3,50)
             self.assertEqual(status,409)
             self.assertEqual(self.run_play('state')[1]['state'],draw['state'])
@@ -120,10 +122,12 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('grant', size=10), (status, grant))
         self.assertEqual(self.run_play('grant', 2, 500)[0], 400)
         self.assertEqual(self.run_play('draw', 2, 50)[0], 409)
+        earned = 0
         for n, expected in [(2, (0, 5, 7)), (3, (0, 0, 2))]:
             status, draw = self.run_play('draw', n, 10)
             self.assertEqual(status, 200)
-            self.assertEqual(tuple(draw['state'][k] for k in ('freeSpins', 'spins', 'coins')), expected)
+            earned += sum(q['coins'] for q in draw['questRewards'])
+            self.assertEqual((draw['state']['freeSpins'], draw['state']['spins'], draw['state']['coins'] - earned), expected)
 
     def test_free_spins_refill_offline_and_stop_at_cap(self):
         start = 100000
@@ -161,7 +165,7 @@ class FullGame(unittest.TestCase):
             self.run_play('draw', 3, 1)
             before = self.run_play('state')[1]['state']
             status, clear = self.run_play('clear-collection', 4)
-            self.assertEqual((status, clear['removed'], clear['state']), (200, 1, {**before, 'owned':{}}))
+            self.assertEqual((status, clear['removed'], clear['state']), (200, 1, {**before, 'owned':{}, 'deck':[None] * 6}))
             self.assertEqual(clear['shuffleReadyAt'], 107200)
             _, draw = self.run_play('draw', 5, 1)
             self.assertTrue(draw['cards'][0]['new'])
@@ -320,3 +324,98 @@ class FullGame(unittest.TestCase):
             results=list(pool.map(lambda _:self.run_play('draw',1,10,uid='C',coins=5), range(2)))
         self.assertEqual(results[0],results[1])
         self.assertEqual(sum(self.run_play('state',uid='C')[1]['state']['owned'].values()),10)
+
+    def test_personal_board_rollover_and_active_order(self):
+        midnight = 2 * game.DAY - game.hunts.MOSCOW
+        def board(uid, now):
+            return self.run_play('state', uid=uid, now=now)[1]['state']['board']
+        first = board('A', midnight-1)
+        self.assertEqual(first, board('A', midnight-2))
+        self.assertNotEqual(first['notices'], board('B', midnight-1)['notices'])
+        self.assertEqual(first['resetsAt'], midnight)
+        self.assertIn(len(first['notices']), range(3, 7))
+        self.assertLessEqual({q['kind'] for q in first['notices']}, {'hunt','draw','craft','break'})
+        a, b = [q for q in first['notices'] if q['kind']=='hunt']
+        status, take = self.run_play('take-contract', 1, now=midnight-1, contract=a['id'])
+        self.assertEqual((status, take['state']['contract']['id']), (200, a['id']))
+        self.assertEqual(self.run_play('take-contract', 1, now=midnight-1, contract=b['id'])[0], 409)
+        self.assertEqual(self.run_play('take-contract', 2, now=midnight-1, contract=b['id'])[0], 409)
+        state = self.run_play('state', now=midnight)[1]['state']
+        self.assertEqual(state['board']['day'], first['day']+1)
+        self.assertEqual(state['contract'], take['state']['contract'])
+        self.assertTrue(all(q.get('progress', 0)==0 for q in state['board']['notices']))
+        self.assertEqual(self.run_play('take-contract', 3, uid='C', now=midnight, contract=a['id'])[0], 409)
+
+    def test_batches_and_multiple_daily_rewards_once(self):
+        board = dict(day=1, resetsAt=2*game.DAY-game.hunts.MOSCOW, notices=[
+            dict(id='a', kind='craft', goal=1, progress=0, reward=2),
+            dict(id='b', kind='craft', goal=4, progress=0, reward=3),
+            dict(id='c', kind='draw', goal=6, progress=0, reward=4),
+            dict(id='d', kind='break', goal=2, progress=0, reward=2),
+        ])
+        self.seed(board=board, dust=50, spins=10)
+        status, out = self.run_play('craft', 1, 1, quantity=4)
+        self.assertEqual((status, out['state']['coins'], out['questRewards']),
+                         (200, 12, [dict(id='a', coins=2), dict(id='b', coins=3)]))
+        self.assertEqual(self.run_play('craft', 1, 1, quantity=4), (status, out))
+        self.assertEqual(self.run_play('craft', 2, 1)[1]['questRewards'], [])
+        self.assertEqual(self.run_play('draw', 3, 10)[1]['questRewards'], [dict(id='c', coins=4)])
+        self.assertEqual(self.run_play('break', 4)[1]['questRewards'], [])
+        self.assertEqual(self.run_play('break', 5, now=107200)[1]['questRewards'], [dict(id='d', coins=2)])
+        self.assertEqual(self.run_play('state', now=107200)[1]['state']['coins'], 18)
+
+    def test_hunt_validation_snapshot_parallel_strike_and_reward(self):
+        strongest = max(game.CARDS, key=lambda cid:game.CARDS[cid][3])
+        self.seed(owned={strongest:3})
+        board = self.run_play('state')[1]['state']['board']
+        a, b = [q for q in board['notices'] if q['kind']=='hunt']
+        contract = a['id']
+        self.assertEqual(self.run_play('take-contract', 1, contract=contract)[0], 200)
+        self.assertEqual(self.run_play('start-hunt', 2, contract=contract)[0], 409)
+        for bad in ([None]*5, ['WIT_X00']+[None]*5, [strongest]*6, [{}]+[None]*5):
+            self.assertEqual(self.run_play('save-deck', 3, slots=bad)[0], 400)
+        slots = [None]*3+[strongest]+[None]*2
+        self.assertEqual(self.run_play('save-deck', 4, slots=slots)[0], 200)
+        self.assertEqual(self.run_play('save-deck', 4, slots=[None]*6)[0], 409)
+        _, out = self.run_play('start-hunt', 5, contract=contract)
+        self.assertEqual(out['state']['fight']['units'][3]['atk'], game.CARDS[strongest][3])
+        self.assertEqual(self.run_play('save-deck', 6, slots=[None]*6)[0], 200)
+        self.assertEqual(self.run_play('start-hunt', 7, contract=contract)[0], 409)
+        self.assertEqual(self.run_play('strike', 8, contract=contract, turn=True)[0], 400)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda n:self.run_play('strike', n, contract=contract, turn=0), (9,10)))
+        self.assertEqual(sorted(code for code, _ in results), [200,409])
+        last = next(out for code, out in results if code==200)
+        self.assertEqual(self.run_play('state')[1]['state']['fight'], last['state']['fight'])
+        if last['state']['fight']['status']=='active':
+            self.assertEqual(last['strike']['events'][-1]['slot'], 3)
+            _, last = self.run_play('strike', 11, contract=contract, turn=1)
+        self.assertEqual(last['state']['fight']['status'], 'won')
+        self.assertEqual(last['state']['coins'], 7+a['reward'])
+        self.assertIsNone(last['state']['contract'])
+        self.assertEqual(self.run_play('strike', 12, contract=contract, turn=0)[0], 409)
+        self.assertEqual(self.run_play('state')[1]['state']['coins'], 7+a['reward'])
+        self.assertEqual(self.run_play('take-contract', 13, contract=contract)[0], 409)
+        self.assertEqual(self.run_play('take-contract', 14, contract=b['id'])[0], 200)
+
+    def test_strikes_front_first_and_third_round_win_or_loss(self):
+        for hp, status in [(9, 'won'), (10, 'lost')]:
+            with self.subTest(hp=hp):
+                contract = dict(id='a', name='Волк альфа', tier=1, reward=3)
+                monster = {**contract, 'hp':hp, 'maxHp':hp, 'atk':1}
+                front = dict(id='WIT_C01', atk=2, hp=1, maxHp=1)
+                rear = dict(id='WIT_C02', atk=3, hp=4, maxHp=4)
+                fight = dict(id='a', status='active', turn=0, monster=monster,
+                             units=[front, None, None, rear, None, None])
+                # Total attack: 4 + 3 + 3 = 10.
+                fight['monster']['hp'] = hp+1
+                state = dict(owned={}, contract=contract, fight=fight, coins=7)
+                for turn in range(3):
+                    self.assertEqual(fight['status'], 'active')
+                    code, result = game.hunts.action(state, game.CARDS, 'strike', {'contract':'a','turn':turn})
+                    self.assertEqual(code, 200)
+                    if turn<2:
+                        self.assertEqual(result['strike']['events'][-1]['slot'], [0,3][turn])
+                self.assertEqual(fight['status'], status)
+                self.assertIsNone(state['contract'])
+                self.assertEqual(state['coins'], 10 if status=='won' else 7)
