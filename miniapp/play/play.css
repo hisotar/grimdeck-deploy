@@ -484,3 +484,45 @@ nav a span{white-space:nowrap;letter-spacing:0}
 .season-portrait[data-frame="blood"]::before{content:'';position:absolute;inset:1px;border-radius:inherit;border:2px dotted #ffb4b6;box-shadow:0 0 3px #ef526b}
 
 .season-face img:not(.avatar-medallion)[src^="https://"]{object-position:center}
+
+/* Settings follow the same graphite surfaces and engraved controls as the deck. */
+.game-brand .header-actions button{white-space:nowrap;padding-inline:8px}
+.game-brand > b{white-space:nowrap}
+.settings-view{--settings-edge:#565149;--settings-accent:#e3c89a;text-align:left}
+.settings-view h1{font-size:clamp(1.55rem,7vw,2rem);overflow-wrap:anywhere}
+.settings-view .settings-back{width:auto;min-width:min(100%,156px);min-height:48px;margin-bottom:16px;padding-inline:12px}
+.settings-back .deck-arrow{width:24px;height:24px}
+.settings-menu,.settings-guide{display:grid;gap:8px;padding:0;margin:0 0 14px;list-style:none}
+.settings-menu a,.settings-guide li{display:grid;grid-template-columns:36px minmax(0,1fr) 24px;gap:10px;align-items:center;min-height:58px;padding:9px 11px;background:var(--bevel);border:1px solid var(--settings-edge);border-radius:8px;box-shadow:var(--recess);text-decoration:none;color:var(--steel-ink);overflow-wrap:anywhere}
+.settings-menu a:active{filter:brightness(.8)}
+.settings-menu .deck-arrow{width:24px;height:24px;transform:scaleX(-1);color:var(--settings-accent)}
+.setting-sigil{width:36px;height:36px;display:grid;place-items:center;font-size:21px;color:var(--settings-accent);border:1px solid #8c795a;border-radius:8px;background:#2a251d}
+.settings-panel{padding:14px;margin-bottom:12px;border:1px solid var(--settings-edge);border-radius:9px;background:var(--iron);box-shadow:var(--recess)}
+.settings-panel p,.settings-guide p{margin:0 0 10px;color:#d0c7ba;overflow-wrap:anywhere}
+.settings-panel p:empty{display:none}
+.settings-panel [role=status] button{margin:6px}
+.settings-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.settings-options button{min-height:46px;overflow-wrap:anywhere}
+.settings-options button[aria-pressed=true]{border-color:#b49b70;color:#ffe8b9;background:#393024}
+.settings-wide{width:100%;margin-top:8px}
+.premium-panel{border-color:#8d7554;background:radial-gradient(ellipse at 12% 0,#58462c66,transparent 70%),var(--iron)}
+.premium-panel h2{margin:0;color:var(--settings-accent)}
+.premium-panel ul{padding-left:1.2em;margin:10px 0 13px}
+.premium-panel li+li{margin-top:6px}
+#premiumNote{font-size:.86rem}
+#referralURL{display:block;width:100%;margin:5px 0 9px}
+.settings-guide li{grid-template-columns:36px minmax(0,1fr);align-items:start;background:var(--iron)}
+.settings-guide h2{font-size:1.03rem;margin:0 0 3px}
+.settings-guide p{font-size:.88rem;margin:0}
+.history-entry{border:1px solid var(--settings-edge);border-radius:6px;margin:0 0 7px;background:#242322}
+.history-entry summary{min-height:44px;padding:10px;cursor:pointer}
+.history-entry summary strong{font-size:1.05rem;color:var(--settings-accent);margin-inline:5px 12px}
+.history-entry summary :is(time,span){font-size:.86rem;color:#d0c7ba}
+.history-entry > p{padding:0 10px}
+.history-cards{display:grid;gap:7px;margin:0;padding:0 10px 10px;list-style:none}
+.history-cards li{display:grid;align-items:baseline;grid-template-columns:1em minmax(0,1fr);column-gap:7px;border-top:1px solid var(--settings-edge);padding-top:5px;overflow-wrap:anywhere}
+.history-cards li small{grid-column:2}
+.history-rarity{color:var(--tone,#d0c7ba)}
+.history-new{color:var(--green)}
+html[data-motion=off] :is(main,dialog),html[data-motion=off] :is(main,dialog) *,html[data-motion=off] :is(main,dialog) *::before,html[data-motion=off] :is(main,dialog) *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.setting-sigil svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}

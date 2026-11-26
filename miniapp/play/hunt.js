@@ -1,5 +1,26 @@
 'use strict';
 const HuntUI=(()=>{
+ const t=I18n.text;
+ const monsters=new Map([
+  ["Альгуль", "Alghoul"],
+  ["Главоглаз", "Gazer"],
+  ["Земляной элементаль", "Earth Elemental"],
+  ["Огненный элементаль", "Fire Elemental"],
+  ["Водный элементаль", "Water Elemental"],
+  ["Ифрит", "Ifrit"],
+  ["Голем", "Golem"],
+  ["Волк альфа", "Alpha Wolf"],
+  ["Полуденница", "Noonwraith"],
+  ["Полуночница", "Nightwraith"],
+  ["Тролль", "Troll"],
+  ["Хим", "Hym"],
+  ["Катакан", "Katakan"],
+  ["Брукса", "Bruxa"],
+  ["Леший", "Leshen"],
+  ["Вилохвост", "Forktail"],
+  ["Грифон", "Griffin"]
+ ]);
+ const monsterName=name=>t(name,monsters.get(name)??name);
  const slots=()=>state?.deck??Array(6).fill(null);
  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  let renderKey='', animating=false, pickerSlot=null, rewardPlaying=false;
@@ -15,9 +36,8 @@ const HuntUI=(()=>{
   (async()=>{
    try{
     while(rewards.length){
-     const {coins}=rewards.shift(), last=coins%10, teens=coins%100>=11&&coins%100<=14;
-     const unit=teens?'крон':last===1?'крона':last>=2&&last<=4?'кроны':'крон';
-     toast.textContent=`Задание выполнено · +${coins} ${unit}`;
+     const {coins}=rewards.shift(), unit=I18n.crowns(coins);
+     toast.textContent=t(`Задание выполнено · +${coins} ${unit}`,`Quest complete · +${coins} ${unit}`);
      toast.classList.add('shown');
      DrawSound.quest();
      await pause(3300);toast.classList.remove('shown');toast.textContent='';
@@ -28,19 +48,19 @@ const HuntUI=(()=>{
  }
  function board(blocked){
   $('questHunt').hidden=!state?.contract;
-  const titles={draw:'Открыть карты',craft:'Выполнить рецепты',break:'Перетасовать колоду'};
+  const titles={draw:t('Открыть карты','Open cards'),craft:t('Выполнить рецепты','Craft recipes'),break:t('Перетасовать колоду','Shuffle the deck')};
   const notices=state?.board?.notices??[];
   $('questBoard').replaceChildren(...notices.filter(q=>!q.taken).map(q=>{
    const isHunt=q.kind==='hunt', complete=!isHunt&&q.goal===q.progress;
    const paper=node('article',undefined,`quest-paper ${isHunt?'quest-contract':'quest-task'}`);
    paper.dataset.quest=q.id;
    if(complete)paper.classList.add('quest-complete');
-   paper.append(node('small',isHunt?'ЗАКАЗ НА ЧУДОВИЩЕ':'ЕЖЕДНЕВНОЕ ЗАДАНИЕ'),node('h2',q.name??titles[q.kind]),node('b',`◉ ${q.reward} ${q.reward===1?'крона':q.reward<5?'кроны':'крон'}`,'quest-pay'));
+   paper.append(node('small',isHunt?t('ЗАКАЗ НА ЧУДОВИЩЕ','MONSTER CONTRACT'):t('ЕЖЕДНЕВНОЕ ЗАДАНИЕ','DAILY QUEST')),node('h2',isHunt?monsterName(q.name):titles[q.kind]),node('b',`◉ ${q.reward} ${I18n.crowns(q.reward)}`,'quest-pay'));
    if(isHunt){
-    paper.append(button(state.contract?'Уже взят заказ':'Сорвать заказ',()=>transact('take-contract',0,1,{contract:q.id}),blocked||!!state.contract));
+    paper.append(button(state.contract?t('Уже взят заказ','Contract already taken'):t('Сорвать заказ','Take contract'),()=>transact('take-contract',0,1,{contract:q.id}),blocked||!!state.contract));
    }else{
-    const count=node('p',`Прогресс: ${q.progress} / ${q.goal}`);
-    paper.append(count,node('small',complete?'✓ Выполнено':'Засчитывается автоматически'));
+    const count=node('p',t(`Прогресс: ${q.progress} / ${q.goal}`,`Progress: ${q.progress} / ${q.goal}`));
+    paper.append(count,node('small',complete?t('✓ Выполнено','✓ Complete'):t('Засчитывается автоматически','Tracked automatically')));
    }
    return paper;
   }));
@@ -48,13 +68,13 @@ const HuntUI=(()=>{
  function pick(i){
   const selections=slots();pickerSlot=i;
   const choices=$('deckChoices');
-  const unset=button('Освободить слот',()=>saveSlot(null),!selections[i]);
+  const unset=button(t('Освободить слот','Clear slot'),()=>saveSlot(null),!selections[i]);
   choices.replaceChildren(unset,...catalog.filter(([id])=>qty(id)&&(!selections.includes(id)||selections[i]===id)).map(([id,name,,atk,hp])=>{
    const b=button(`${name} · ⚔ ${atk} · ♥ ${hp}`,()=>saveSlot(id),selections[i]===id);
    b.prepend(media(id));return b;
   }));
-  if(!Object.keys(state.owned).length)choices.append(node('p','Сначала открой хотя бы одну карту.'));
-  $('deckPickerTitle').textContent=i<3?`Фронт · слот ${i+1}`:`Тыл · слот ${i-2}`;
+  if(!Object.keys(state.owned).length)choices.append(node('p',t('Сначала открой хотя бы одну карту.','Open at least one card first.')));
+  $('deckPickerTitle').textContent=i<3?t(`Фронт · слот ${i+1}`,`Front · slot ${i+1}`):t(`Тыл · слот ${i-2}`,`Rear · slot ${i-2}`);
   $('deckPicker').showModal();tg?.BackButton?.show();
  }
  function saveSlot(id){
@@ -77,7 +97,7 @@ const HuntUI=(()=>{
   transact('save-deck',0,1,{slots:next});
  }
  function table(el, units, editable, blocked, target){
-  el.replaceChildren(...['Фронт · защита','Тыл · атака'].map((title,row)=>{
+  el.replaceChildren(...[t('Фронт · защита','Front · defense'),t('Тыл · атака','Rear · attack')].map((title,row)=>{
    const band=node('div',undefined,'battle-band');
    const label=node('h2',title);label.dataset.emblem=row?'✦':'⬟';band.append(label);
    const grid=node('div',undefined,'battle-slots');
@@ -94,7 +114,7 @@ const HuntUI=(()=>{
      if(i===target)el.classList.add('counter-target');
      if(!editable&&!unit.hp)el.classList.add('defeated');
     }else el.append(node('span',editable?'+':'—','slot-empty'));
-    if(editable)el.setAttribute('aria-label',`${title}, слот ${i%3+1}: ${c?.[1]??'выбрать карту'}`);
+    if(editable)el.setAttribute('aria-label',t(`${title}, слот ${i%3+1}: ${c?.[1]??'выбрать карту'}`,`${title}, slot ${i%3+1}: ${c?.[1]??'choose a card'}`));
     grid.append(el);
    }
    band.append(grid);return band;
@@ -104,9 +124,9 @@ const HuntUI=(()=>{
   const portrait=node('div',undefined,'hunt-portrait');
   if(info.art&&art.has(info.art))portrait.append(media(info.art,false,true));
   else portrait.append(node('span','◇','hunt-sigil'));
-  portrait.append(node('h2',info.name));
+  portrait.append(node('h2',monsterName(info.name)));
   if(info.hp!==undefined){
-   const health=node('p','Здоровье: ','enemy-health');
+   const health=node('p',t('Здоровье: ','Health: '),'enemy-health');
    health.append(node('b',info.hp,'enemy-hp'),` / ${info.maxHp}`);portrait.append(health);
   }
   return portrait;
@@ -122,18 +142,18 @@ const HuntUI=(()=>{
   $('autoDeck').disabled=blocked||!Object.keys(state?.owned??{}).length;
   $('resetDeck').disabled=blocked||!slots().some(Boolean);
   const panel=$('battleContract');
-  panel.replaceChildren(node('p','ЗАКАЗ НА ЧУДОВИЩЕ','hunt-kicker'));
+  panel.replaceChildren(node('p',t('ЗАКАЗ НА ЧУДОВИЩЕ','MONSTER CONTRACT'),'hunt-kicker'));
   if(!contract){
-   const link=node('a','На доску объявлений →','hunt-link');link.href='#tool-quests';
-   panel.append(node('p','Нет взятого заказа.'),link);
+   const link=node('a',t('На доску объявлений →','To the notice board →'),'hunt-link');link.href='#tool-quests';
+   panel.append(node('p',t('Нет взятого заказа.','No active contract.')),link);
   }else{
-   panel.append(enemy(contract),node('p',`Награда: ◉ ${contract.reward}`, 'hunt-note'));
+   panel.append(enemy(contract),node('p',t(`Награда: ◉ ${contract.reward}`,`Reward: ◉ ${contract.reward}`), 'hunt-note'));
    if(fight?.status==='active'){
-    const link=node('a','Продолжить охоту →','hunt-link');link.href='#hunt';panel.append(link);
+    const link=node('a',t('Продолжить охоту →','Continue hunting →'),'hunt-link');link.href='#hunt';panel.append(link);
    }else{
-    const start=button('Выполнить заказ',()=>transact('start-hunt',0,1,{contract:contract.id}),blocked||!slots().some(Boolean));
+    const start=button(t('Выполнить заказ','Start hunt'),()=>transact('start-hunt',0,1,{contract:contract.id}),blocked||!slots().some(Boolean));
     start.classList.add('primary','hunt-wide');panel.append(start);
-    if(!slots().some(Boolean))panel.append(node('p','Поставь на стол хотя бы одну карту.','hunt-note'));
+    if(!slots().some(Boolean))panel.append(node('p',t('Поставь на стол хотя бы одну карту.','Place at least one card on the board.'),'hunt-note'));
    }
   }
   const strike=$('strike');strike.hidden=!fight||fight.status!=='active';strike.disabled=blocked||strike.hidden;
@@ -143,18 +163,18 @@ const HuntUI=(()=>{
    $('huntEnemy').append(enemy(fight.monster));
    table($('huntDeck'),fight.units,false,true,huntTarget);
    if(Number.isInteger(huntTarget)&&fight.status==='active'){
-    const name=cards.get(fight.units[huntTarget]?.id)?.[1]??'карта';
-    const tactic=fight.monster.tactic==='rear'?'Целится в тыл':'Давит на фронт';
-    intent.hidden=false;intent.textContent=`${tactic} · ответ по ${huntTarget<3?'фронту':'тылу'}: ${name} · ${fight.monster.atk} урона`;
+    const name=cards.get(fight.units[huntTarget]?.id)?.[1]??t('карта','card');
+    const tactic=fight.monster.tactic==='rear'?t('Целится в тыл','Targets the rear'):t('Давит на фронт','Targets the front');
+    intent.hidden=false;intent.textContent=t(`${tactic} · ответ по ${huntTarget<3?'фронту':'тылу'}: ${name} · ${fight.monster.atk} урона`,`${tactic} · counters the ${huntTarget<3?'front':'rear'}: ${name} · ${fight.monster.atk} damage`);
    }
-   strike.textContent=`Ударить · осталось ${3-fight.turn} из 3`;
+   strike.textContent=t(`Ударить · осталось ${3-fight.turn} из 3`,`Strike · ${3-fight.turn} of 3 left`);
    if(fight.status!=='active')outcome(fight);
-  }else $('huntOutcome').textContent=state?'Нет начатой охоты.':'Загружаем охоту…';
+  }else $('huntOutcome').textContent=state?t('Нет начатой охоты.','No hunt in progress.'):t('Загружаем охоту…','Loading the hunt…');
  }
  function outcome(fight){
   const o=$('huntOutcome'), won=fight.status==='won';
   o.className=won?'hunt-victory':'hunt-defeat';
-  o.textContent=won?`Заказ выполнен · +${fight.monster.reward} ◉`:'Заказ провален';
+  o.textContent=won?t(`Заказ выполнен · +${fight.monster.reward} ◉`,`Contract complete · +${fight.monster.reward} ◉`):t('Заказ провален','Contract failed');
  }
  async function finish(fight, version){
   if(fight.status==='active'||targetPane()!=='hunt')return;
@@ -212,12 +232,12 @@ const HuntUI=(()=>{
      if(navigation!==version||targetPane()!=='hunt')break;
      if(counter){el.querySelector('.unit-hp').textContent=event.unitHp;el.classList.toggle('defeated',!event.unitHp);}
      else monster.querySelector('.enemy-hp').textContent=event.monsterHp;
-     impact(target,counter,event.damage);
      DrawSound.cue(counter?'hunt-counter':'hunt-hit');
      if(!motion.matches){
+      impact(target,counter,event.damage);
       target.animate?.([{transform:'none'},{transform:`translate(${counter?4:-4}px,${counter?5:-3}px) rotate(${counter?4:-2}deg)`,offset:.22},{transform:'none'}],{duration:210});
       await mover.animate?.([{transform:contact,zIndex:6},{transform:'none',zIndex:6}],{duration:counter?240:160,easing:'ease-out'}).finished.catch(()=>{});
-     }else await pause(95);
+     }
     }
    }finally{animating=false;renderKey='';refresh();}
    showRewards(out.questRewards);

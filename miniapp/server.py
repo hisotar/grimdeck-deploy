@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -18,12 +19,14 @@ FILES = {'/': ('index.html', 'text/html; charset=utf-8'), '/game.js': ('game.js'
 CARD = 'WIT_C01'
 
 
-def signed_player(raw, token, allowed):
+def signed_launch(raw, token, allowed):
     if not isinstance(raw, str):
         raise ValueError()
     pairs = parse_qsl(raw, keep_blank_values=True, strict_parsing=True, max_num_fields=32)
     fields = dict(pairs)
-    if len(fields) != len(pairs):
+    # Raw line breaks could make different field sets share one signed check string.
+    if len(fields) != len(pairs) or any(not re.fullmatch(r'[a-z_][a-z0-9_]*', k) or '\r' in v or '\n' in v
+                                        for k, v in pairs):
         raise ValueError()
     supplied = fields.pop('hash', '')
     check = '\n'.join(f'{k}={v}' for k, v in sorted(fields.items())).encode()
@@ -35,7 +38,11 @@ def signed_player(raw, token, allowed):
     user = json.loads(fields['user'])
     if not isinstance(user, dict) or type(user.get('id')) is not int or user['id'] not in allowed:
         raise ValueError()
-    return user
+    return user, fields.get('start_param')
+
+
+def signed_player(raw, token, allowed):
+    return signed_launch(raw, token, allowed)[0]
 
 
 def player_id(raw, token, allowed):

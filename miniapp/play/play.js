@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const rarities={C:['Обычная','♠',34],R:['Редкая','✧',27],E:['Эпическая','☾',21],L:['Легендарная','♜',16],M:['Мифическая','✦',2]};
-const rarityGroups=[['M','Мифические'],['L','Легендарные'],['E','Эпические'],['R','Редкие'],['C','Обычные']];
+const rarities={C:[I18n.text('Обычная','Common'),'♠',34],R:[I18n.text('Редкая','Rare'),'✧',27],E:[I18n.text('Эпическая','Epic'),'☾',21],L:[I18n.text('Легендарная','Legendary'),'♜',16],M:[I18n.text('Мифическая','Mythic'),'✦',2]};
+const rarityGroups=[['M',I18n.text('Мифические','Mythic')],['L',I18n.text('Легендарные','Legendary')],['E',I18n.text('Эпические','Epic')],['R',I18n.text('Редкие','Rare')],['C',I18n.text('Обычные','Common')]];
 const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
 const buttons=[...document.querySelectorAll('[data-size]')];
@@ -12,7 +12,8 @@ const testerButtons=[...grants,$('clearCollection'),$('resetShuffle'),$('clearDu
 const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
-const motion=matchMedia('(prefers-reduced-motion: reduce)');
+const systemMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const motion={get matches(){return systemMotion.matches||SettingsUI.noMotion();}};
 const frameUrl='/art/card-frame.webp';
 async function waitForFrame(image){
  // Decode the actual layer that will rotate. A decorative asset must not strand a draw.
@@ -32,7 +33,7 @@ async function api(path,data,signal){
  const options=data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
  const res=await fetch(`/api/${path}`,{...options,signal});
  const out=await res.json();
- if(!res.ok)throw Object.assign(new Error(out.error||'Запрос не выполнен'),{status:res.status});
+ if(!res.ok)throw Object.assign(new Error(I18n.serverError(out.error)),{status:res.status});
  return out;
 }
 function accept(out){
@@ -73,7 +74,7 @@ function renderDetail(id){
  $('detailTitle').textContent=name;
  $('detailRarity').textContent=`${mark} ${rarity}`;
  $('detailLore').textContent=lore;
- $('detailStats').replaceChildren(...[['Атака',atk],['Здоровье',hp],['Ценность',value],['Пыль за лишнюю копию',dust]].map(([label,value])=>{
+ $('detailStats').replaceChildren(...[[I18n.text('Атака','Attack'),atk],[I18n.text('Здоровье','Health'),hp],[I18n.text('Ценность','Value'),value],[I18n.text('Пыль за лишнюю копию','Dust per duplicate'),dust]].map(([label,value])=>{
   const stat=node('div');stat.append(node('dt',label),node('dd',value));return stat;
  }));
 }
@@ -128,14 +129,14 @@ function album(){
  albumKey=key;
 }
 const loot=[
- ['dust','1–5 пыли','M12 3l4 9-4 9-4-9zM3 12h2m14 0h2'],
- ['dust2','Пыль ×2','M12 2 14.5 9.5 22 12 14.5 14.5 12 22 9.5 14.5 2 12 9.5 9.5Z'],
- ['spins','3 крутки','M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5'],
- ['dust10','Пыль ×10','M12 2l2 7 7-2-4 5 4 5-7-2-2 7-2-7-7 2 4-5-4-5 7 2Z'],
- ['legendary','Легендарная карта','M6 3h12v18H6zM9 12l3-4 3 4-3 4z'],
- ['mythic','Мифическая карта','M5 3h14v18H5zM12 6l1.4 4.6L17 12l-3.6 1.4L12 18l-1.4-4.6L7 12l3.6-1.4z']
+ ['dust',I18n.text('1–5 пыли','1–5 dust'),'M12 3l4 9-4 9-4-9zM3 12h2m14 0h2'],
+ ['dust2',I18n.text('Пыль ×2','Dust ×2'),'M12 2 14.5 9.5 22 12 14.5 14.5 12 22 9.5 14.5 2 12 9.5 9.5Z'],
+ ['spins',I18n.text('3 крутки','3 spins'),'M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5'],
+ ['dust10',I18n.text('Пыль ×10','Dust ×10'),'M12 2l2 7 7-2-4 5 4 5-7-2-2 7-2-7-7 2 4-5-4-5 7 2Z'],
+ ['legendary',I18n.text('Легендарная карта','Legendary card'),'M6 3h12v18H6zM9 12l3-4 3 4-3 4z'],
+ ['mythic',I18n.text('Мифическая карта','Mythic card'),'M5 3h14v18H5zM12 6l1.4 4.6L17 12l-3.6 1.4L12 18l-1.4-4.6L7 12l3.6-1.4z']
 ];
-const percent=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2});
+const percent=new Intl.NumberFormat(I18n.locale,{maximumFractionDigits:2});
 const svgNS='http://www.w3.org/2000/svg';
 const lootRows=loot.map(([kind,label,d])=>{
  const icon=document.createElementNS(svgNS,'svg'), path=document.createElementNS(svgNS,'path');
@@ -154,7 +155,7 @@ const craftIcons={
  arena:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M13 21l8-11-4 1-6 8m-1-2 5 4m-3-2-2 3'],
  arenaHealth:['M5 6 16 3l11 3v9c0 6-4 11-11 15C9 26 5 21 5 15Z','M8 8l8-2 8 2v7c0 5-3 9-8 12-5-3-8-7-8-12Z M16 21l-5-5c-3-4 2-7 5-3 3-4 8-1 5 3Z']
 };
-const boostInfo={draw:['Талисман удачи','×1,5 к шансу легендарных и мифических · 10 круток'],shuffle:['Печать мастерства','Повышает мастерство на 1 уровень на следующие 4 перетасовки'],arena:['Руна атаки','+1 к атаке на арене'],arenaHealth:['Руна здоровья','+1 к здоровью на арене']};
+const boostInfo={draw:[I18n.text('Талисман удачи','Lucky Talisman'),I18n.text('×1,5 к шансу легендарных и мифических · 10 круток','×1.5 legendary and mythic odds · 10 spins')],shuffle:[I18n.text('Печать мастерства','Seal of Mastery'),I18n.text('Повышает мастерство на 1 уровень на следующие 4 перетасовки','Raises mastery by 1 level for the next 4 shuffles')],arena:[I18n.text('Руна атаки','Attack Rune'),I18n.text('+1 к атаке на арене','+1 attack in the arena')],arenaHealth:[I18n.text('Руна здоровья','Health Rune'),I18n.text('+1 к здоровью на арене','+1 health in the arena')]};
 const arenaRunes=new Set(['arena','arenaHealth']);
 const materialNames={C:['обычная','обычные','обычных'],R:['редкая','редкие','редких'],E:['эпическая','эпические','эпических'],L:['легендарная','легендарные','легендарных'],M:['мифическая','мифические','мифических']};
 function craftIcon(kind){
@@ -167,7 +168,7 @@ function craftIcon(kind){
  return icon;
 }
 const plural=(n,one,few,many)=>n%100>=11&&n%100<=14?many:n%10===1?one:n%10>=2&&n%10<=4?few:many;
-const spinLabel=n=>`${n} ${plural(n,'крутка','крутки','круток')}`;
+const spinLabel=n=>I18n.text(`${n} ${plural(n,'крутка','крутки','круток')}`,`${n} ${n===1?'spin':'spins'}`);
 const craftTitle=(recipe,n=1)=>recipe.boost?`${boostInfo[recipe.boost][0]}${n>1?` ×${n}`:''}`:`+${spinLabel(recipe.spins*n)}`;
 function materialIcon(kind){
  if(kind==='dust'){
@@ -189,14 +190,14 @@ function buildCraft(){
   const material=node('small',undefined,'craft-material');material.append(materialIcon(recipe.material),amount);
   copy.append(title,material);if(boost)copy.append(node('small',boostInfo[boost][1]));
   const controls=node('div',undefined,'craft-quantity');
-  const count=node('input'), max=node('button','Макс.'), reset=node('button','Сброс');
+  const count=node('input'), max=node('button',I18n.text('Макс.','Max')), reset=node('button',I18n.text('Сброс','Reset'));
   count.type='range';count.min='1';count.max='1';count.step='1';count.value='1';
   const quantity=node('output','×1','craft-batch');
-  count.setAttribute('aria-label',`Количество выполнений: ${title.textContent}`);
-  max.type='button';max.setAttribute('aria-label',`Максимальное количество: ${title.textContent}`);
-  reset.type='button';reset.setAttribute('aria-label',`Сбросить количество до 1: ${title.textContent}`);
-  const button=node('button','Создать','primary craft-submit');button.type='button';
-  button.setAttribute('aria-label',`Создать: ${title.textContent}`);
+  count.setAttribute('aria-label',I18n.text(`Количество выполнений: ${title.textContent}`,`Crafting quantity: ${title.textContent}`));
+  max.type='button';max.setAttribute('aria-label',I18n.text(`Максимальное количество: ${title.textContent}`,`Set maximum quantity: ${title.textContent}`));
+  reset.type='button';reset.setAttribute('aria-label',I18n.text(`Сбросить количество до 1: ${title.textContent}`,`Reset quantity to 1: ${title.textContent}`));
+  const button=node('button',I18n.text('Создать','Craft'),'primary craft-submit');button.type='button';
+  button.setAttribute('aria-label',I18n.text(`Создать: ${title.textContent}`,`Craft: ${title.textContent}`));
   const receipt=node('small',undefined,'craft-receipt');receipt.setAttribute('role','status');
   const entry={recipe,id,amount,material,title,count,quantity,max,reset,button,receipt,limit:0};
   count.oninput=()=>updateRecipe(entry,busy||!!pending);
@@ -208,7 +209,7 @@ function buildCraft(){
   $(boost?'craftBoostList':'craftSpinList').append(row);recipeRows.push(entry);
   if(boost){
    const item=node('div',undefined,'craft-row'), info=node('div'), status=node('small');
-   const activate=node('button','Активировать');activate.type='button';activate.setAttribute('aria-label',`Активировать: ${boostInfo[boost][0]}`);activate.onclick=()=>transact('activate-boost',id);
+   const activate=node('button',I18n.text('Активировать','Activate'));activate.type='button';activate.setAttribute('aria-label',I18n.text(`Активировать: ${boostInfo[boost][0]}`,`Activate: ${boostInfo[boost][0]}`));activate.onclick=()=>transact('activate-boost',id);
    info.append(node('strong',boostInfo[boost][0]),status);item.append(craftIcon(boost),info,activate);$('craftInventory').append(item);
    inventoryRows.push({boost,status,button:activate});
   }
@@ -218,7 +219,8 @@ function updateRecipe({recipe,amount,material,title,count,quantity,max,reset,but
  const n=Number(count.value), cost=recipe.cost*n, adjectives=materialNames[recipe.material];
  title.textContent=craftTitle(recipe,n);
  const name=adjectives?`${plural(cost,...adjectives)} ${plural(cost,'повторка','повторки','повторок')}`:'пыли';
- amount.textContent=`${cost} ${name} · есть ${have}`;
+ const materialEn=adjectives?`${rarities[recipe.material][0].toLowerCase()} ${cost===1?'duplicate':'duplicates'}`:'dust';
+ amount.textContent=I18n.text(`${cost} ${name} · есть ${have}`,`${cost} ${materialEn} · have ${have}`);
  material.classList.toggle('insufficient',!limit);
  quantity.value=`×${n}`;
  count.disabled=blocked||limit<=1;
@@ -243,14 +245,14 @@ function refreshCraft(blocked){
  }
  for(const {boost,status,button} of inventoryRows){
   const n=inventory[boost]||0, left=active[boost]||0;
-  status.textContent=`В запасе: ${n}${arenaRunes.has(boost)?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`;
+  status.textContent=I18n.text(`В запасе: ${n}${arenaRunes.has(boost)?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`,`In stock: ${n}${arenaRunes.has(boost)?' · Arena not open yet':left?` · Uses left: ${left}`:''}`);
   button.disabled=blocked||!n||!!left||arenaRunes.has(boost);
  }
- for(const [id,kind,text] of [['drawBoost','draw',`×1,5 к шансу легендарных и мифических · 24% и 3%`],['shuffleBoost','shuffle','+1 к мастерству перетасовки']]){
+ for(const [id,kind,text] of [['drawBoost','draw',I18n.text(`×1,5 к шансу легендарных и мифических · 24% и 3%`,`×1.5 legendary and mythic odds · 24% and 3%`)],['shuffleBoost','shuffle',I18n.text('+1 к мастерству перетасовки','+1 shuffle mastery')]]){
   const el=$(id), left=active[kind]||0;
-  el.hidden=!left;if(left)el.textContent=`${text} · Осталось: ${left}`;
+  el.hidden=!left;if(left)el.textContent=I18n.text(`${text} · Осталось: ${left}`,`${text} · Uses left: ${left}`);
  }
- const chances=$('drawChances');chances.textContent=`Обычная ${active.draw?25:34}% · редкая 27% · эпическая 21% · легендарная ${active.draw?24:16}% · мифическая ${active.draw?3:2}%. Внутри редкости шансы карт равны.`;
+ const chances=$('drawChances');chances.textContent=I18n.text(`Обычная ${active.draw?25:34}% · редкая 27% · эпическая 21% · легендарная ${active.draw?24:16}% · мифическая ${active.draw?3:2}%. Внутри редкости шансы карт равны.`,`Common ${active.draw?25:34}% · rare 27% · epic 21% · legendary ${active.draw?24:16}% · mythic ${active.draw?3:2}%. All cards of the same rarity are equally likely.`);
 }
 for(const [id,isBoost] of [['craftSpinTab',false],['craftBoostTab',true]])$(id).onclick=()=>{
  $('craftSpinTab').setAttribute('aria-pressed',String(!isBoost));$('craftBoostTab').setAttribute('aria-pressed',String(isBoost));
@@ -258,13 +260,13 @@ for(const [id,isBoost] of [['craftSpinTab',false],['craftBoostTab',true]])$(id).
 };
 function refreshShuffle(blocked){
  const now=clock(), wait=Math.ceil(Math.max(0,shuffleReadyAt-now)/60);
- $('breakInfo').textContent=wait?`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`:'Готово к перетасовке. Повторы не нужны.';
+ $('breakInfo').textContent=wait?I18n.text(`Следующая через ${Math.floor(wait/60)} ч ${wait%60} мин.`,`Next in ${Math.floor(wait/60)}h ${wait%60}m.`):I18n.text('Готово к перетасовке. Повторы не нужны.','Ready to shuffle. No duplicates needed.');
  $('break').disabled=blocked||!!wait;
  if(!shuffleMastery)return;
  const expired=now>=shuffleMastery.resetsAt, count=expired?0:shuffleMastery.count, level=expired?1:shuffleMastery.level;
  [...$('masterySteps').children].forEach((step,i)=>{if(i+1===level)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');});
  const boosted=(state.activeBoosts?.shuffle||0)>0, effective=level+Number(boosted);
- $('masteryInfo').textContent=`Сегодня: ${count} · Следующая: мастерство ×${effective}${boosted?` (временный уровень ${roman(effective)})`:''} · Сброс в 00:00 UTC`;
+ $('masteryInfo').textContent=I18n.text(`Сегодня: ${count} · Следующая: мастерство ×${effective}${boosted?` (временный уровень ${roman(effective)})`:''} · Сброс в 00:00 UTC`,`Today: ${count} · Next: mastery ×${effective}${boosted?` (temporary level ${roman(effective)})`:''} · Resets at 00:00 UTC`);
  const {weights}=shuffleMastery, total=Object.values(weights).reduce((sum,weight)=>sum+weight,0);
  for(const [kind,chance] of lootRows){
   const points=kind==='dust'?10000-total*effective:weights[kind]*effective;
@@ -283,7 +285,7 @@ function showShuffleReveal(out,title,extra,cardName){
  reveal.dataset.kind=out.bonus||'';
  reveal.style.setProperty('--reveal-hold',`${hold}ms`);
  const copy=node('div',undefined,'shuffle-reveal-copy');
- copy.append(node('span','НАГРАДА','shuffle-reveal-label'),node('strong',title));
+ copy.append(node('span',I18n.text('НАГРАДА','REWARD'),'shuffle-reveal-label'),node('strong',title));
  if(extra)copy.append(node('span',extra,'shuffle-reveal-extra'));
  if(cardName)copy.append(node('b',cardName,'shuffle-reveal-name'));
  const crest=out.rewardCard?cardPortrait(out.rewardCard.id):node('span','✦','shuffle-reveal-mark');
@@ -295,13 +297,13 @@ function showShuffleReward(out){
  const result=$('breakResult');
  result.dataset.kind=out.bonus||'';
  const isSidePrize=out.rewardCard||out.bonus==='spins';
- const title=out.rewardCard?(out.bonus==='mythic'?'Мифическая карта':'Легендарная карта'):
-  out.bonus==='spins'?'+3 крутки':`+${out.gain} пыли`;
+ const title=out.rewardCard?(out.bonus==='mythic'?I18n.text('Мифическая карта','Mythic card'):I18n.text('Легендарная карта','Legendary card')):
+  out.bonus==='spins'?I18n.text('+3 крутки','+3 spins'):I18n.text(`+${out.gain} пыли`,`+${out.gain} dust`);
  const notes=[];
- if(out.rewardCard?.new)notes.push('Новая карта');
- if(out.bonus==='dust2'||out.bonus==='dust10')notes.push(`${out.baseDust} пыли ×${out.bonus==='dust2'?2:10}`);
+ if(out.rewardCard?.new)notes.push(I18n.text('Новая карта','New card'));
+ if(out.bonus==='dust2'||out.bonus==='dust10')notes.push(I18n.text(`${out.baseDust} пыли ×${out.bonus==='dust2'?2:10}`,`${out.baseDust} dust ×${out.bonus==='dust2'?2:10}`));
  // Saved receipts from before the change keep their original dust award on retry.
- if(isSidePrize&&out.gain>0)notes.push(`+${out.gain} пыли по старым правилам`);
+ if(isSidePrize&&out.gain>0)notes.push(I18n.text(`+${out.gain} пыли по старым правилам`,`+${out.gain} dust under the previous rules`));
  const extra=notes.join(' · ');
  result.replaceChildren(node('strong',title));
  if(extra)result.append(node('div',extra));
@@ -320,15 +322,15 @@ function refresh(){
  const total=left+spins+rewardSpins;
  $('totalSpins').textContent=total;$('coins').textContent=state.coins;$('dust').textContent=state.dust;$('influence').textContent=state.influence??0;
  const freeMinutes=Math.ceil(Math.max(0,state.freeNextAt-clock())/60);
- $('free').textContent=`Бесплатные: ${left} из 5`;
- $('freeTimer').textContent=left===5?'Запас полный · +1 каждые 3 часа':freeMinutes?`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`:'Обновляем крутки…';
- $('testSpins').textContent=`Тестовые крутки: ${spins}`;
+ $('free').textContent=I18n.text(`Бесплатные: ${left} из 5`,`Free spins: ${left} of 5`);
+ $('freeTimer').textContent=left===5?I18n.text('Запас полный · +1 каждые 3 часа','Full · +1 every 3 hours'):freeMinutes?I18n.text(`Следующая через ${Math.floor(freeMinutes/60)} ч ${freeMinutes%60} мин`,`Next in ${Math.floor(freeMinutes/60)}h ${freeMinutes%60}m`):I18n.text('Обновляем крутки…','Refilling spins…');
+ $('testSpins').textContent=I18n.text(`Тестовые крутки: ${spins}`,`Test spins: ${spins}`);
  if(testPanel)testPanel.hidden=!canGrantSpins;
  for(const b of grants)b.disabled=blocked||!canGrantSpins;
  for(const b of buttons){const size=Number(b.dataset.size),cost=Math.max(0,size-total),missing=cost-state.coins;
-  const available=`Доступно: ${total}`;
-  const note=missing>0?`Не хватает ${missing} ◉`:cost?`${cost} ◉`:available;
-  b.replaceChildren(node('b',size===1?'Крутить':`×${size}`),node('small',size===1?available:note));
+  const available=I18n.text(`Доступно: ${total}`,`Available: ${total}`);
+  const note=missing>0?I18n.text(`Не хватает ${missing} ◉`,`Need ${missing} more ◉`):cost?`${cost} ◉`:available;
+  b.replaceChildren(node('b',size===1?I18n.text('Крутить','Spin'):`×${size}`),node('small',size===1?available:note));
   if(size===1&&cost)b.append(node('small',note));
   b.disabled=blocked||missing>0;
  }
@@ -339,7 +341,7 @@ function refresh(){
  refreshShuffle(blocked);refreshCraft(blocked);HuntUI.render(blocked);
  $('retry').hidden=!pending||busy;SeasonUI.block(blocked);
 }
-const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','profile','glory','pack','detail','battle','hunt'];
+const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','profile','glory','pack','detail','battle','hunt',...SettingsUI.screens];
 const rarityRank=new Map(rarityGroups.map(([r],i)=>[r,i]));
 let activePane=null, activeDetail=null, transition=null, navigation=0, hasPack=false, stopScene=null;
 const main=document.querySelector('main'), pageStamp=crypto.randomUUID();
@@ -385,11 +387,13 @@ async function route(){
  for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${['hunt','glory'].includes(id)?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
  void SeasonUI.open(id);
+ SettingsUI.open(id);
  if(id==='hunt'&&!main.inert)HuntUI.resumed();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open&&!dustConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo({top:returning?.top??0,behavior:'instant'});
  if(activeDetail)$('detailTitle').focus({preventScroll:true});
+ if(!main.inert&&SettingsUI.screens.includes(id)&&!returning)$(`${id}-title`).focus({preventScroll:true});
  if(returning)detailTriggers(id,returning.id)[returning.index]?.focus({preventScroll:true});
 }
 function table(prefix){
@@ -403,14 +407,14 @@ function resetTable({face,holder,stage,label,rarity}){
 async function flip(entry,{face,holder,stage,label,rarity},pane){
  // Mount the inert face before turning; backface culling hides it until the edge.
  paint(face,entry.id,true);face.setAttribute('aria-hidden','true');face.hidden=false;
- await waitForFrame(face.querySelector('.card-frame'));
+ if(!motion.matches)await waitForFrame(face.querySelector('.card-frame'));
  let turn,frame,exposed=false;
  const visible=()=>!$(pane).hidden&&targetPane()===pane;
  const expose=()=>{
   if(exposed)return;
   const r=entry.id[4];
   exposed=true;stage.dataset.r=r;
-  rarity.textContent=`Выпала ${rarities[r][0].toLowerCase()}`;
+  rarity.textContent=I18n.text(`Выпала ${rarities[r][0].toLowerCase()}`,`${rarities[r][0]} card drawn`);
   label.hidden=!entry.new;rarity.parentElement.classList.add('shown');
   if(visible())DrawSound.reveal(r);
  };
@@ -442,15 +446,15 @@ async function reveal(out){
  const featured=list.reduce((best,{id},i)=>rarityRank.get(id[4])<rarityRank.get(list[best].id[4])?i:best,0);
  const scene=table('pack-');
  resetTable(scene);
- $('packTitle').textContent=`Результаты ×${list.length}`;
+ $('packTitle').textContent=I18n.text(`Результаты ×${list.length}`,`Results ×${list.length}`);
  $('packRest').hidden=true;
  $('packGrid').replaceChildren(...list.flatMap(({id,new:isNew},i)=>{
   if(i===featured)return [];
   const item=node('div',undefined,'pack-entry');item.append(tile(id));
-  if(isNew){const slot=node('div',undefined,'pack-new-slot');slot.append(node('span','Новая','new-card-label'));item.append(slot);}
+  if(isNew){const slot=node('div',undefined,'pack-new-slot');slot.append(node('span',I18n.text('Новая','New'),'new-card-label'));item.append(slot);}
   return [item];
  }));
- $('summary').textContent=`Новых карт: ${out.newCount} из ${list.length}`;
+ $('summary').textContent=I18n.text(`Новых карт: ${out.newCount} из ${list.length}`,`New cards: ${out.newCount} of ${list.length}`);
  hasPack=true;
  say('');
  if(targetPane()==='home')await go('pack');
@@ -458,7 +462,7 @@ async function reveal(out){
  finally{
   $('packRest').hidden=false;
   if(targetPane()!=='pack'){
-   const link=node('a',`Смотреть результаты ×${list.length}`,'notice-link');link.href='#pack';$('notice').replaceChildren(link);
+   const link=node('a',I18n.text(`Смотреть результаты ×${list.length}`,`View results ×${list.length}`),'notice-link');link.href='#pack';$('notice').replaceChildren(link);
   }
  }
 }
@@ -538,8 +542,8 @@ async function craftAtBench(id,quantity){
  const onBench=()=>targetPane()==='tool-craft'&&!$('tool-craft').hidden;
  const overlay=$('craftOverlay'), table=$('craftBench'), hammer=$('craftHammer'), bag=$('craftBag'), stack=$('craftStack'), air=$('craftParticles'), item=$('craftItem');
  const receipt=recipeRows.find(row=>row.id===id)?.receipt;
- const confirm=()=>{if(receipt)receipt.textContent=`Создано: ${title}`;};
- if(!onBench()){confirm();say(`Создано: ${title}`);return;}
+ const confirm=()=>{if(receipt)receipt.textContent=I18n.text(`Создано: ${title}`,`Crafted: ${title}`);};
+ if(!onBench()){confirm();say(I18n.text(`Создано: ${title}`,`Crafted: ${title}`));return;}
  say('');
  if(motion.matches||!table.animate){confirm();DrawSound.cue('forge-ready');return;}
  item.hidden=true;overlay.hidden=false;
@@ -612,13 +616,13 @@ async function craftAtBench(id,quantity){
   cleanup();confirm();
   if(onBench()){
    item.dataset.kind=recipe.boost||'spins';
-   item.replaceChildren(craftIcon(item.dataset.kind),node('small','СОЗДАНО'),node('b',title));item.hidden=false;
+   item.replaceChildren(craftIcon(item.dataset.kind),node('small',I18n.text('СОЗДАНО','CRAFTED')),node('b',title));item.hidden=false;
    DrawSound.cue('forge-ready');
    await new Promise(resolve=>{
     const hold=setTimeout(resolve,680);
     stopScene=()=>{clearTimeout(hold);resolve();};
    });
-  }else say(`Создано: ${title}`);
+  }else say(I18n.text(`Создано: ${title}`,`Crafted: ${title}`));
   overlay.hidden=true;stopScene=null;
  }
 }
@@ -655,34 +659,34 @@ async function transact(kind,size,quantity=1,params){
   pending=null;remember();
   if(op.kind!=='strike'&&op.kind!=='edit-profile')HuntUI.showRewards(out.questRewards);
   if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior);
-  else if(op.kind==='edit-profile'){SeasonUI.saved(out.profileIdentity);say('Профиль сохранён.');}
-  else if(op.kind==='draw')await reveal(out);
+  else if(op.kind==='edit-profile'){SeasonUI.saved(out.profileIdentity);say(I18n.text('Профиль сохранён.','Profile saved.'));}
+  else if(op.kind==='draw'){SettingsUI.drawRecorded();await reveal(out);}
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
-  else if(op.kind==='activate-boost')say(`Активировано: ${boostInfo[out.activated][0]}`);
-  else if(op.kind==='grant')say(`Начислено тестовых круток: ${out.granted}`);
+  else if(op.kind==='activate-boost')say(I18n.text(`Активировано: ${boostInfo[out.activated][0]}`,`Activated: ${boostInfo[out.activated][0]}`));
+  else if(op.kind==='grant')say(I18n.text(`Начислено тестовых круток: ${out.granted}`,`Test spins granted: ${out.granted}`));
   else if(op.kind==='clear-collection'){
    resetTable(table(''));resetTable(table('pack-'));
    hasPack=false;$('packRest').hidden=true;$('packGrid').replaceChildren();
    if(location.hash==='#pack')await route();
-   say(`Коллекция очищена · удалено видов карт: ${out.removed}`);
+   say(I18n.text(`Коллекция очищена · удалено видов карт: ${out.removed}`,`Collection cleared · card types removed: ${out.removed}`));
   } else if(op.kind==='reset-shuffle'){
    hideShuffleReveal();$('breakResult').hidden=true;
-   say('Таймер перетасовки сброшен.');
-  }else if(op.kind==='clear-dust')say(`Пыль обнулена · удалено: ${out.dustRemoved}`);
-  else if(op.kind==='renew-board')say('На доске новый комплект объявлений.');
+   say(I18n.text('Таймер перетасовки сброшен.','Shuffle timer reset.'));
+  }else if(op.kind==='clear-dust')say(I18n.text(`Пыль обнулена · удалено: ${out.dustRemoved}`,`Dust cleared · removed: ${out.dustRemoved}`));
+  else if(op.kind==='renew-board')say(I18n.text('На доске новый комплект объявлений.','New notices are up on the board.'));
   else {
    try{await shuffleDeck();}catch{} // A visual failure must not undo a confirmed operation.
    if(targetPane()==='tool-shuffle')DrawSound.cue('shuffle-ready',!!out.bonus);
    showShuffleReward(out);
   }
  }catch(e){
-  if(!pending)say('Операция сохранена, но результат не удалось показать.');
+  if(!pending)say(I18n.text('Операция сохранена, но результат не удалось показать.','The operation was saved, but its result could not be displayed.'));
   else if(e.status===400||e.status===409){conflict=e.status===409;pending=null;remember();say(e.message);}
-  else say(e.status===401?'Открой игру заново. Запрос сохранён.':'Ответ не получен. Повтори тот же запрос: двойного списания не будет.');
+  else say(e.status===401?I18n.text('Открой игру заново. Запрос сохранён.','Reopen the game. Your request was saved.'):I18n.text('Ответ не получен. Повтори тот же запрос: двойного списания не будет.','No response was received. Retry the same request; you will not be charged twice.'));
  }finally{busy=false;refresh();if(!$('album').hidden)album();}
  if(conflict)sync();
 }
-function sound(){ $('sound').textContent=DrawSound.enabled?'Звук: вкл.':'Звук: выкл.';$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
+function sound(){ $('sound').textContent=DrawSound.enabled?I18n.text('Звук: вкл.','Sound: on'):I18n.text('Звук: выкл.','Sound: off');$('sound').setAttribute('aria-pressed',String(DrawSound.enabled)); }
 $('sound').onclick=()=>{DrawSound.toggle();if(DrawSound.enabled)DrawSound.unlock();sound();};sound();
 for(const b of buttons)b.onclick=()=>transact('draw',Number(b.dataset.size));
 for(const b of grants)b.onclick=()=>{if(canGrantSpins)transact('grant',Number(b.dataset.grant));};
@@ -704,8 +708,9 @@ main.addEventListener('click',e=>{
 window.addEventListener('hashchange',route);window.addEventListener('focus',sync);
 setInterval(()=>{if(!busy)refresh();if((state?.freeNextAt&&clock()>=state.freeNextAt)||state?.board?.resetsAt<=clock()||seasonEndsAt<=clock())sync();},5000);
 $('detailBack').onclick=returnFromDetail;
-tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(dustConfirm.open)dustConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(['hunt','glory'].includes(targetPane()))go('battle');else if(targetPane()==='profile')go($('profileBack').hash.slice(1));else if(targetPane()==='detail')returnFromDetail();else go('home');});
+tg?.BackButton?.onClick(()=>{if(clearConfirm.open)clearConfirm.close('cancel');else if(dustConfirm.open)dustConfirm.close('cancel');else if($('deckPicker').open)$('deckPicker').close();else if(['hunt','glory'].includes(targetPane()))go('battle');else if(targetPane()==='profile')go($('profileBack').hash.slice(1));else if(targetPane()==='detail')returnFromDetail();else if(SettingsUI.screens.slice(1).includes(targetPane()))go('settings');else go('home');});
 HuntUI.bind();
+SettingsUI.bind();
 
 function gameStyleReady(signal){
  const style=$('gameStyle');
@@ -757,7 +762,7 @@ async function firstScreenArt(){
   const [out,images]=await Promise.all([api('state',undefined,signal),optionalStartup(api('art',undefined,signal),[],2200)]);
   if(signal.aborted)return;
   art=new Set(images);accept(out);refresh();await route();
-  say(pending?'Предыдущий запрос не завершён. Можно повторить.':local?'Локальный стенд · стартовый баланс 120 монет':'');
+  say(pending?I18n.text('Предыдущий запрос не завершён. Можно повторить.','The previous request did not finish. You can retry it.'):local?I18n.text('Локальный стенд · стартовый баланс 120 монет','Local test mode · 120 starting crowns'):'');
   await firstScreenArt();
   if(signal.aborted)return;
   grimBoot.show(main);HuntUI.resumed();

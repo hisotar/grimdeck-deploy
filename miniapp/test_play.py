@@ -538,6 +538,176 @@ class FullGame(unittest.TestCase):
             own = request('profile/me', cookie=cookie)[1]
             self.assertEqual((own['name'], own['avatar'], own['telegramAvatar']), ('Белый Волк', 'wolf', None))
 
+    def api_client(self, *, telegram=True, app_url='https://t.me/GrimDeckBot/game'):
+        server = game.ThreadingHTTPServer(('127.0.0.1', 0), game.Play)
+        server.db, server.telegram, server.token = self.path, telegram, 'fixture-token'
+        server.allowed, server.origin = set(range(1, 10)), 'https://game.example.invalid'
+        server.telegram_app_url = app_url
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(worker.join)
+        self.addCleanup(server.shutdown)
+
+        def request(path, payload=None, cookie=''):
+            with closing(HTTPConnection(*server.server_address, timeout=3)) as conn:
+                conn.request('GET' if payload is None else 'POST', '/api/'+path,
+                             None if payload is None else json.dumps(payload),
+                             {'Origin':server.origin, 'Content-Type':'application/json', 'Cookie':cookie})
+                res = conn.getresponse()
+                return res.status, json.loads(res.read()), (res.getheader('Set-Cookie') or '').split(';')[0]
+
+        def signed(uid, **fields):
+            fields.update(auth_date=str(int(time.time())), user=json.dumps(dict(id=uid)))
+            check = '\n'.join(f'{k}={v}' for k, v in sorted(fields.items())).encode()
+            secret = hmac.digest(b'WebAppData', server.token.encode(), 'sha256')
+            return urlencode(dict(fields, hash=hmac.digest(secret, check, 'sha256').hex()))
+
+        return server, request, signed
+
+    def test_owner_spin_history_uses_successful_journal_with_stable_pagination(self):
+        server, request, signed = self.api_client()
+        owner = request('session', dict(initData=signed(1)))[2]
+        other = request('session', dict(initData=signed(2)))[2]
+        now = int(time.time())
+        legacy_cards = [dict(id='WIT_C01', new=True)]
+        with closing(sqlite3.connect(self.path)) as db, db:
+            # Former deployments have no receipt timestamp or order, nor do all legacy receipts name a season.
+            for op in ('legacy-z', 'legacy-a'):
+                db.execute('INSERT INTO operations VALUES (?,?,?,?,?)',
+                           ('tg:1', op, 'draw', 1, json.dumps(dict(cards=legacy_cards))))
+            game.schema(db, now=now)
+        self.assertEqual(self.run_play('grant', 99, 10, uid='tg:2', now=now)[0], 200)
+        self.assertEqual(self.run_play('draw', 100, 10, uid='tg:2', now=now)[0], 200)
+        self.assertEqual(self.run_play('draw', 101, 50, uid='tg:1', now=now, coins=3)[0], 409)
+        self.run_play('grant', 102, 50, uid='tg:1', now=now)
+        _, first = self.run_play('draw', 90, 10, uid='tg:1', now=now)
+        cards = [f'WIT_C{n:02}' for n in range(1, 21)]
+        with patch.object(game.secrets, 'choice', side_effect=reversed(cards)):
+            for n in range(20, 0, -1):
+                self.assertEqual(self.run_play('draw', n, 1, uid='tg:1', now=now)[0], 200)
+        self.assertEqual(self.run_play('draw', 90, 10, uid='tg:1', now=now)[1]['cards'], first['cards'])
+        self.assertEqual(request('spin-history')[0], 401)
+        for offset in ('-1', 'a', '', '1&offset=2', '9223372036854775808'):
+            self.assertEqual(request('spin-history?offset='+offset, cookie=owner)[0], 400)
+        status, page, _ = request('spin-history?uid=tg:2', cookie=owner)
+        self.assertEqual((status, page['total'], page['openings'], page['next'], len(page['entries'])),
+                         (200, 32, 23, 20, 20))
+        self.assertEqual([e['cards'][0]['id'] for e in page['entries']], cards)
+        self.assertTrue(all((e['size'], e['at'], e['season']) == (1, now, first['state']['season'])
+                            for e in page['entries']))
+        page = request('spin-history?offset=20', cookie=owner)[1]
+        self.assertEqual(page['entries'][0], dict(size=10, cards=first['cards'], at=now, season=first['state']['season']))
+        self.assertEqual(page['entries'][1:], [dict(size=1, cards=legacy_cards, at=None, season=None)] * 2)
+        self.assertIsNone(page['next'])
+        self.assertEqual(request('spin-history?offset=999', cookie=owner)[1],
+                         dict(total=32, openings=23, entries=[], next=None))
+        self.assertEqual(request('spin-history', cookie=other)[1]['total'], 10)
+        server.allowed.remove(2)
+        self.assertEqual(request('spin-history', cookie=other)[0], 401)
+
+    def test_referrals_only_use_signed_creation_attribution_and_successful_draws(self):
+        server, request, signed = self.api_client()
+        def session(uid, param=None, **payload):
+            fields = {} if param is None else {'start_param': param}
+            status, _, cookie = request('session', dict(initData=signed(uid, **fields), **payload))
+            self.assertEqual(status, 200)
+            return cookie
+
+        def info(cookie):
+            status, out, _ = request('referral', cookie=cookie)
+            self.assertEqual(status, 200)
+            return out
+
+        def draw(cookie, n, size=1):
+            return request('draw', dict(op=f'referral-draw-{n:04}', size=size), cookie)
+
+        self.assertEqual(request('referral')[0], 401)
+        inviter = session(1)
+        first_info = info(inviter)
+        self.assertRegex(first_info['url'], r'^https://t\.me/GrimDeckBot/game\?startapp=[A-Za-z0-9_-]{24}$')
+        self.assertEqual(first_info['count'], 0)
+        code = first_info['url'].split('=')[1]
+        self.assertEqual(info(session(1, code)), first_info)  # Reopening one's own link cannot award a referral.
+        self.assertEqual(draw(inviter, 1)[0], 200)
+        self.assertEqual(request('session', dict(initData=signed(2)+'&start_param='+code))[0], 401)
+        self.assertEqual(request('session', dict(initData=signed(2, **{'start_param='+code+'\nuser': '{"id": 2}'})))[0], 401)
+        self.assertEqual(request('session', dict(initData=signed(99, start_param=code)))[0], 401)
+        for uid in (3, 4, 5):
+            if uid == 3:
+                session(uid, start_param=code, startapp=code)  # Unsigned body parameters are ignored.
+            elif uid == 4:
+                session(uid, 'x'*24)  # Unknown code does not block login.
+            else:
+                server.allowed.remove(1)
+                session(uid, code)  # Revoked inviter is not accepted at attribution.
+                server.allowed.add(1)
+            self.assertEqual(draw(session(uid, code), 1)[0], 200)  # Existing accounts cannot be attributed.
+        self.assertEqual(info(inviter), first_info)
+        friend = session(2, code)
+        self.assertEqual(draw(friend, 1, 50)[0], 409)
+        second_inviter = session(6)
+        second_code = info(second_inviter)['url'].split('=')[1]
+        friend = session(2, second_code)  # Attribution is immutable, even before a successful draw.
+        self.assertEqual(info(inviter), first_info)
+        with ThreadPoolExecutor(max_workers=3) as workers:
+            self.assertEqual(list(workers.map(lambda n: draw(friend, n)[0], [1, 1, 2])), [200, 200, 200])
+        self.assertEqual(info(inviter), {**first_info, 'count': 1})
+        self.assertEqual(info(second_inviter)['count'], 0)
+        with closing(sqlite3.connect(self.path)) as db:
+            state = json.loads(db.execute('SELECT state FROM players WHERE uid=?', ('tg:1',)).fetchone()[0])
+            self.assertEqual(state['rewardSpins'], 0)  # GET counts a successful conversion without settling it.
+        with ThreadPoolExecutor(max_workers=3) as workers:
+            balances = list(workers.map(lambda _: request('state', cookie=inviter)[1]['state']['rewardSpins'], range(3)))
+        self.assertEqual(balances, [5, 5, 5])
+        self.assertEqual(draw(session(7, code), 1)[0], 200)
+        self.assertEqual(info(inviter)['count'], 2)
+        self.assertEqual(draw(inviter, 1)[1]['state']['rewardSpins'], 10)  # Successful retry settles new rewards too.
+        self.assertEqual(request('state', cookie=inviter)[1]['state']['rewardSpins'], 10)
+        server.telegram_app_url = None
+        self.assertEqual(info(inviter), dict(url=None, count=2))
+        server.allowed.remove(1)
+        self.assertEqual(request('referral', cookie=inviter)[0], 401)
+
+    def test_referral_reward_and_player_state_roll_back_together(self):
+        _, request, signed = self.api_client()
+        inviter = request('session', dict(initData=signed(1)))[2]
+        code = request('referral', cookie=inviter)[1]['url'].split('=')[1]
+        request('session', dict(initData=signed(2, start_param=code)))
+        execute = game.execute
+
+        def fail_after(sql_prefix):
+            def fail(db, sql, args=()):
+                result = execute(db, sql, args)
+                if sql.startswith(sql_prefix):
+                    raise sqlite3.OperationalError('simulated write failure')
+                return result
+            return patch.object(game, 'execute', side_effect=fail)
+
+        with fail_after('UPDATE referrals SET earned=1'), self.assertRaises(sqlite3.OperationalError):
+            self.run_play('draw', size=1, uid='tg:2')
+        self.assertEqual(request('referral', cookie=inviter)[1]['count'], 0)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(game.spin_history(db, 'tg:2', 0)['total'], 0)
+        self.assertEqual(self.run_play('draw', size=1, uid='tg:2')[0], 200)
+        with fail_after('INSERT INTO players'), self.assertRaises(sqlite3.OperationalError):
+            self.run_play('state', uid='tg:1')
+        self.assertEqual(request('referral', cookie=inviter)[1]['count'], 1)
+        for _ in range(2):
+            self.assertEqual(request('state', cookie=inviter)[1]['state']['rewardSpins'], 5)
+
+    def test_local_referrals_disabled_and_launch_url_validation(self):
+        _, request, _ = self.api_client(telegram=False)
+        cookie = request('session', dict(initData='invalid', start_param='x'*24))[2]
+        self.assertEqual(request('referral', cookie=cookie)[1], dict(url=None, count=0))
+        self.assertEqual(request('spin-history', cookie=cookie)[1], dict(total=0, openings=0, entries=[], next=None))
+        self.assertIsNone(game.referral_app_url(''))
+        self.assertEqual(game.referral_app_url('https://t.me/GrimDeckBot/'), 'https://t.me/GrimDeckBot')
+        for bad in ('http://t.me/bot', 'https://t.me@other.invalid/bot', 'https://t.me/bot?startapp=code',
+                    'https://t.me/bot#game', 'https://t.me/bot/app/extra'):
+            with self.subTest(bad=bad), self.assertRaises(SystemExit):
+                game.referral_app_url(bad)
+
     def test_telegram_identity_optional_fields_and_photo_rules(self):
         normalize = game.seasons.telegram_identity
         self.assertEqual(normalize(dict(id=1)), {})

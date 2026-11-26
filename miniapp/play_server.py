@@ -36,8 +36,8 @@ def connect(target):
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
-from server import Handler, ThreadingHTTPServer, SimpleCookie, CookieError, signed_player
+from urllib.parse import parse_qs, urlsplit
+from server import Handler, ThreadingHTTPServer, SimpleCookie, CookieError, signed_launch
 
 WEB = Path(__file__).resolve().parent / 'play'
 ROOT = WEB.parents[1]
@@ -50,6 +50,8 @@ SHUFFLE_COOLDOWN = 2 * 3600
 SHUFFLE_BONUSES = {'dust2': 1000, 'spins': 500, 'dust10': 300, 'legendary': 50, 'mythic': 5}
 FREE_INTERVAL = 3 * 3600
 MAX_FREE_SPINS = 5
+HISTORY_PAGE_SIZE = 20
+REFERRAL_SPINS = 5
 PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
@@ -82,6 +84,13 @@ def schema(db, *, now=None):
         CREATE TABLE IF NOT EXISTS players (uid TEXT PRIMARY KEY, state TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS operations (uid TEXT, op TEXT, kind TEXT, size INTEGER, result TEXT,
         PRIMARY KEY(uid,op));
+        CREATE INDEX IF NOT EXISTS successful_draws ON operations (uid,op) WHERE kind='draw';
+        CREATE TABLE IF NOT EXISTS draw_receipt_order (uid TEXT NOT NULL, op TEXT NOT NULL,
+        position BIGINT NOT NULL, drawn_at BIGINT NOT NULL, PRIMARY KEY(uid,op), UNIQUE(uid,position));
+        CREATE TABLE IF NOT EXISTS referral_codes (uid TEXT PRIMARY KEY, code TEXT UNIQUE NOT NULL);
+        CREATE TABLE IF NOT EXISTS referrals (invitee TEXT PRIMARY KEY, inviter TEXT NOT NULL,
+        earned INTEGER NOT NULL DEFAULT 0, applied INTEGER NOT NULL DEFAULT 0, CHECK(invitee<>inviter));
+        CREATE INDEX IF NOT EXISTS referrals_by_inviter ON referrals (inviter,earned,applied);
         CREATE TABLE IF NOT EXISTS season_config (id INTEGER PRIMARY KEY, baseline TEXT NOT NULL);'''
     for statement in statements.split(';'):
         if statement.strip():
@@ -90,6 +99,53 @@ def schema(db, *, now=None):
     # Legacy players belong to the launch season even if they don't log in before rollover.
     execute(db, 'INSERT INTO season_config VALUES (1,?) ON CONFLICT(id) DO NOTHING', (baseline,))
     db.commit()
+
+
+def spin_history(db, uid, offset):
+    # Both totals and the page use one database snapshot, including on PostgreSQL.
+    rows = execute(db, '''WITH totals AS (
+        SELECT COUNT(*) AS openings, COALESCE(SUM(size), 0) AS spins FROM operations
+        WHERE uid=? AND kind='draw'
+    ), page AS (
+        SELECT o.op, o.size, o.result, d.position, d.drawn_at FROM operations o
+        LEFT JOIN draw_receipt_order d ON d.uid=o.uid AND d.op=o.op
+        WHERE o.uid=? AND o.kind='draw'
+        ORDER BY (d.position IS NULL), d.position DESC, o.op
+        LIMIT ? OFFSET ?
+    )
+    SELECT totals.openings, totals.spins, page.size, page.result, page.drawn_at FROM totals
+    LEFT JOIN page ON 1=1 ORDER BY (page.position IS NULL), page.position DESC, page.op''',
+                   (uid, uid, HISTORY_PAGE_SIZE, offset)).fetchall()
+    openings, total = rows[0][:2]
+    entries = []
+    for _, _, size, receipt, at in rows:
+        if receipt is not None:
+            result = json.loads(receipt)
+            # Old IDs give a stable fallback for pagination, not a historical chronology.
+            entries.append(dict(size=size, cards=result['cards'], at=at, season=result.get('receiptSeason')))
+    end = offset + len(entries)
+    return dict(total=total, openings=openings, entries=entries, next=end if end < openings else None)
+
+
+def referral_app_url(raw):
+    base = raw.strip().rstrip('/')
+    if base and not re.fullmatch(r'https://t\.me/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)?', base):
+        raise SystemExit('GRIM_TELEGRAM_APP_URL must be https://t.me/<bot>[/<app>] without query or fragment')
+    return base or None
+
+
+def referral_info(db, uid, app_url):
+    url = None
+    if app_url:
+        while True:
+            row = execute(db, 'SELECT code FROM referral_codes WHERE uid=?', (uid,)).fetchone()
+            if row:
+                url = f'{app_url}?startapp={row[0]}'
+                break
+            execute(db, 'INSERT INTO referral_codes VALUES (?,?) ON CONFLICT DO NOTHING',
+                    (uid, secrets.token_urlsafe(18)))
+    count = execute(db, 'SELECT COUNT(*) FROM referrals WHERE inviter=? AND earned=1', (uid,)).fetchone()[0]
+    return dict(url=url, count=count)
 
 
 def first_season(db):
@@ -139,7 +195,7 @@ def refill_free_spins(state, now):
         state['freeNextAt'] = 0 if state['freeSpins'] == MAX_FREE_SPINS else next_at + earned * FREE_INTERVAL
 
 
-def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
+def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_param=None, allowed=()):
     # Take the season timestamp under the lock, not while the request is waiting.
     if postgres(db):
         execute(db, 'SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', (uid,))
@@ -164,8 +220,11 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
     state.setdefault('contractsCompleted', 0)
 
     def save():
+        for (invitee,) in pending_rewards:
+            execute(db, 'UPDATE referrals SET applied=1 WHERE invitee=?', (invitee,))
         execute(db, 'INSERT INTO players VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET state=excluded.state',
                 (uid, json.dumps(state)))
+
     if 'freeSpins' not in state:
         day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
         used = state.pop('used', 0)
@@ -176,6 +235,18 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
     utc_day = now // DAY
     shuffles = state.get('shuffleCount', 0) if state.get('shuffleDay') == utc_day else 0
     state.setdefault('rewardSpins', 0)
+    if not row and telegram_defaults is not None and re.fullmatch(r'[A-Za-z0-9_-]{24}', start_param or ''):
+        candidate = execute(db, 'SELECT uid FROM referral_codes WHERE code=?', (start_param,)).fetchone()
+        if candidate and candidate[0] != uid and candidate[0].startswith('tg:') and int(candidate[0][3:]) in allowed:
+            execute(db, 'INSERT INTO referrals (invitee,inviter) VALUES (?,?) ON CONFLICT(invitee) DO NOTHING',
+                    (uid, candidate[0]))
+    # Only this player's transaction can settle these events, under its existing lock.
+    # A reward earned concurrently but absent from this snapshot is left for next time.
+    pending_rewards = execute(db, 'SELECT invitee FROM referrals WHERE inviter=? AND earned=1 AND applied=0',
+                              (uid,)).fetchall()
+    if pending_rewards:
+        state['rewardSpins'] += REFERRAL_SPINS * len(pending_rewards)
+        needs_save = True
     inventory = state.setdefault('boostInventory', {})
     active = state.setdefault('activeBoosts', {})
     hunts.board_for(state, uid, now)
@@ -226,6 +297,9 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
             return 409, {'error':'Операция уже использована'}
         if old_season != season:
             return 409, {'error': 'Операция уже завершена в прошлом сезоне'}
+        if pending_rewards:
+            save()
+            db.commit()
         return 200, {**reply(),**result}
     if data.get('season', season) != season:
         return 409, {'error': 'Начался новый сезон. Повтори действие после обновления'}
@@ -349,6 +423,12 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None):
     save()
     execute(db,'INSERT INTO operations VALUES (?,?,?,?,?)',
             (uid,op,kind,size,json.dumps({**result, 'receiptSeason': season})))
+    if kind == 'draw':
+        execute(db, '''INSERT INTO draw_receipt_order (uid,op,position,drawn_at)
+                       SELECT ?,?,COALESCE(MAX(position),0)+1,? FROM draw_receipt_order WHERE uid=?''',
+                (uid, op, now, uid))
+        # The invitee is already locked. This writes no inviter state and commits with the draw receipt.
+        execute(db, 'UPDATE referrals SET earned=1 WHERE invitee=? AND earned=0', (uid,))
     db.commit()
     return 200, {**reply(),**result}
 
@@ -361,10 +441,13 @@ class Play(Handler):
         self.send(status,json.dumps(data,ensure_ascii=False).encode(),'application/json; charset=utf-8',cookie)
 
     def do_GET(self):
-        path=urlsplit(self.path).path
+        target = urlsplit(self.path)
+        path = target.path
         files={'/':(WEB/'index.html','text/html; charset=utf-8'),'/play.css':(WEB/'play.css','text/css'),'/play.js':(WEB/'play.js','text/javascript'),'/draw-sound.js':(ROOT/'draw-sound.js','text/javascript'),'/cards.js':(ROOT/'cards.js','text/javascript')}
         files['/hunt.js'] = (WEB/'hunt.js', 'text/javascript')
         files['/season.js'] = (WEB/'season.js', 'text/javascript')
+        files['/i18n.js'] = (WEB/'i18n.js', 'text/javascript')
+        files['/settings.js'] = (WEB/'settings.js', 'text/javascript')
         if path == '/quest-complete.mp3':
             sound = WEB/'the_witcher_3_quests_completed_sound.mp3'
             if sound.is_file(): return self.send(200, sound.read_bytes(), 'audio/mpeg')
@@ -382,6 +465,8 @@ class Play(Handler):
         if path=='/api/art': return self.response(200,[cid for cid in CARDS if (WEB/'art'/f'{cid}.webp').is_file()])
         if path=='/api/state': return self.api('state',{})
         if path=='/api/top': return self.api('top',{})
+        if path=='/api/spin-history': return self.api('spin-history', {'query': target.query})
+        if path=='/api/referral': return self.api('referral', {})
         if re.fullmatch(r'/api/profile/(?:me|[0-9a-f]{24})', path):
             return self.api('profile', {'id': path.rsplit('/', 1)[1]})
         self.response(404,{})
@@ -407,9 +492,10 @@ class Play(Handler):
                 row=execute(db,'SELECT uid FROM play_sessions WHERE digest=? AND expires>?',(digest,now)).fetchone()
                 if kind=='session':
                     if secure:
-                        user = signed_player(data.get('initData'), self.server.token, self.server.allowed)
+                        user, start_param = signed_launch(data.get('initData'), self.server.token, self.server.allowed)
                         uid = 'tg:' + str(user['id'])
-                        play(db, uid, 'state', {}, 3, telegram_defaults=seasons.telegram_identity(user))
+                        play(db, uid, 'state', {}, 3, telegram_defaults=seasons.telegram_identity(user),
+                             start_param=start_param, allowed=self.server.allowed)
                     elif row: return self.response(200,{'player':self.player_key(row[0])})
                     else: uid='local:'+secrets.token_hex(16)
                     sid=secrets.token_urlsafe(32); ttl=3600 if secure else 30*DAY
@@ -422,6 +508,20 @@ class Play(Handler):
                 # Only a current allowlisted Telegram session (or the loopback demo)
                 # reaches play(), so grants always affect that tester's own account.
                 uid = row[0]
+                if kind == 'spin-history':
+                    try:
+                        offset, = parse_qs(data['query'], keep_blank_values=True, max_num_fields=32).get('offset', ['0'])
+                        if not re.fullmatch(r'[0-9]{1,19}', offset) or int(offset) > 2**63-1:
+                            raise ValueError()
+                    except ValueError:
+                        return self.response(400, {'error': 'Некорректное смещение'})
+                    return self.response(200, spin_history(db, uid, int(offset)))
+                if kind == 'referral':
+                    if not secure:
+                        return self.response(200, dict(url=None, count=0))
+                    out = referral_info(db, uid, getattr(self.server, 'telegram_app_url', None))
+                    db.commit()
+                    return self.response(200, out)
                 if kind in ('top', 'profile'):
                     def include(other):
                         return (other.startswith('tg:') and int(other[3:]) in self.server.allowed
@@ -451,6 +551,7 @@ def main():
     token=os.environ['TELEGRAM_BOT_TOKEN'].strip() if telegram else ''
     allowed={int(u) for u in os.environ['GRIM_TEST_USERS'].split(',')} if telegram else set()
     if telegram and (not token or not allowed): raise SystemExit('Нужен токен и список тестировщиков')
+    app_url = referral_app_url(os.environ.get('GRIM_TELEGRAM_APP_URL', '')) if telegram else None
     os.umask(0o077)
     if hosted:
         dbfile=os.environ.get('DATABASE_URL','')
@@ -463,6 +564,7 @@ def main():
     with closing(connect(dbfile)) as db: schema(db)
     server=ThreadingHTTPServer(bind,Play)
     server.db,server.telegram,server.origin,server.token,server.allowed=dbfile,telegram,origin,token,allowed
+    server.telegram_app_url = app_url
     server.serve_forever()
 
 if __name__=='__main__': main()

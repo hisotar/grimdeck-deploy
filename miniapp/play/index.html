@@ -1,5 +1,6 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#151617"><title>GrimDeck — Континент</title>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#151617"><title data-i18n-text="GrimDeck — The Continent">GrimDeck — Континент</title>
 <!-- The splash must paint even while the game stylesheet and scripts are still downloading. -->
+<script>try{if(localStorage.getItem("grimdeck.motion")==="off")document.documentElement.dataset.motion="off";}catch{}</script>
 <style>
 html{color-scheme:dark;background:#151617}body{margin:0}
 body:has(#startup[data-phase]:not([data-phase="ready"])){overflow:hidden}
@@ -22,10 +23,11 @@ main[inert]{visibility:hidden;pointer-events:none}
 #startupRetry:focus-visible{outline:2px solid #d9dcdf;outline-offset:3px}
 #startup:not([data-phase="loading"]) .startup-orbit{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){#startup{transition:none}.startup-orbit{animation:none}}
+html[data-motion="off"] #startup{transition:none}html[data-motion="off"] .startup-orbit{animation:none}
 </style>
 <link id="gameStyle" rel="stylesheet" href="/play.css" media="print" fetchpriority="high" onload="this.media='all'" onerror="this.dataset.failed='true'">
 <link rel="preload" as="image" href="/art/card-frame.webp" type="image/webp"><link rel="preload" as="image" href="/art/GrimDeck_card_back.webp" type="image/webp">
-<script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/hunt.js"></script><script defer src="/season.js"></script><script defer src="/play.js"></script>
+<script defer src="https://telegram.org/js/telegram-web-app.js"></script><script defer src="/cards.js"></script><script defer src="/draw-sound.js"></script><script defer src="/i18n.js"></script><script defer src="/settings.js"></script><script defer src="/hunt.js"></script><script defer src="/season.js"></script><script defer src="/play.js"></script>
 </head><body data-mode="telegram">
 <div id="startup" data-phase="loading">
  <div class="startup-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -52,19 +54,19 @@ main[inert]{visibility:hidden;pointer-events:none}
   </svg>
   <p class="startup-name">GRIMDECK</p>
   <div class="startup-seal" aria-hidden="true">◆</div>
-  <p id="startupStatus" role="status">Готовим колоду…</p>
-  <button id="startupRetry" type="button" hidden>Повторить загрузку</button>
-  <noscript><p>Для запуска игры включи JavaScript и открой её заново.</p></noscript>
+  <p id="startupStatus" role="status" data-i18n-text="Preparing your deck…">Готовим колоду…</p>
+  <button id="startupRetry" type="button" hidden data-i18n-text="Retry loading">Повторить загрузку</button>
+  <noscript><p data-i18n-text="Enable JavaScript and reopen the game to play.">Для запуска игры включи JavaScript и открой её заново.</p></noscript>
  </div>
 </div>
 <script>
 const grimBoot=(()=>{
  const screen=document.getElementById('startup'), status=document.getElementById('startupStatus');
  const retry=document.getElementById('startupRetry'), controller=new AbortController();
- const unavailable='Не удалось загрузить игру. Проверь подключение и попробуй снова.';
+ const bootText=(ru,en)=>typeof I18n==='undefined'?ru:I18n.text(ru,en);
  let started=false;
- const timer=setTimeout(()=>fail('Игра загружается слишком долго. Попробуй ещё раз.'),18000);
- function fail(message=unavailable){
+ const timer=setTimeout(()=>fail(bootText('Игра загружается слишком долго. Попробуй ещё раз.','The game is taking too long to load. Try again.')),18000);
+ function fail(message=bootText('Не удалось загрузить игру. Проверь подключение и попробуй снова.','Could not load the game. Check your connection and try again.')){
   if(screen.dataset.phase!=='loading')return;
   clearTimeout(timer);controller.abort();screen.dataset.phase='error';status.textContent=message;retry.hidden=false;
  }
@@ -77,7 +79,7 @@ const grimBoot=(()=>{
   show(main){
    if(controller.signal.aborted)return;
    clearTimeout(timer);screen.dataset.phase='ready';screen.setAttribute('aria-hidden','true');main.inert=false;
-   if(matchMedia('(prefers-reduced-motion: reduce)').matches)screen.hidden=true;
+   if(document.documentElement.dataset.motion==='off'||matchMedia('(prefers-reduced-motion: reduce)').matches)screen.hidden=true;
    else setTimeout(()=>{screen.hidden=true;},200);
   }
  };
@@ -91,21 +93,21 @@ const grimBoot=(()=>{
  </symbol>
  <symbol id="nav-arrow" viewBox="0 0 24 24"><path d="M20 12H4m0 0 6-6m-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </defs></svg>
-<div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><a class="profile-link" href="#profile" aria-label="Мой профиль"><span>Профиль</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a><button id="sound" type="button">Звук</button></div></div>
- <dl class="wallet" aria-label="Баланс">
-  <div><dt title="Крутки"><span class="wallet-label">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+<div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><button id="openSettings" type="button" aria-controls="settings" data-i18n-text="Settings">Настройки</button><button id="sound" type="button" data-i18n-text="Sound">Звук</button></div></div>
+ <dl class="wallet" aria-label="Баланс" data-i18n-aria-label="Balance">
+  <div><dt title="Крутки" data-i18n-title="Spins"><span class="wallet-label" data-i18n-text="Spins">Крутки</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
    <rect x="8" y="5" width="14" height="21" rx="2" transform="rotate(-22 15 15)" fill="#333b3b" stroke="#8e9fa1"/>
    <rect x="11" y="5" width="14" height="21" rx="2" transform="rotate(15 18 15)" fill="#323635" stroke="#c0af91"/>
    <rect x="9" y="5" width="14" height="22" rx="2" fill="#242728" stroke="#d9c097" stroke-width="1.3"/>
    <path d="M16 9l4 7-4 7-4-7Z" fill="#697f84" stroke="#cfdfdd"/><circle cx="16" cy="16" r="1.4" fill="#f6e5bf"/>
   </svg></dt><dd id="totalSpins">—</dd></div>
-  <div><dt title="Пыль"><span class="wallet-label">Пыль</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <div><dt title="Пыль" data-i18n-title="Dust"><span class="wallet-label" data-i18n-text="Dust">Пыль</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
    <path d="M5 24q6-1 8-5t7 0q2 4 7 5-10 5-22 0Z" fill="#8d5e39" stroke="#d5a36e"/>
    <path d="M16 4l1.4 4.6L22 10l-4.6 1.4L16 16l-1.4-4.6L10 10l4.6-1.4Z" fill="#ffe3a1"/>
    <path d="M24 9l.8 2.2L27 12l-2.2.8L24 15l-.8-2.2L21 12l2.2-.8Z" fill="#e8b67a"/>
    <circle cx="8" cy="16" r="1.25" fill="#e8b67a"/><circle cx="15" cy="22" r="1" fill="#f1c98b"/><circle cx="20" cy="23" r=".8" fill="#ffdf9f"/><circle cx="24" cy="18" r=".9" fill="#e8b67a"/>
   </svg></dt><dd id="dust">—</dd></div>
-  <div><dt title="Монеты (кроны)"><span class="wallet-label">Монеты (кроны)</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <div><dt title="Монеты (кроны)" data-i18n-title="Coins (crowns)"><span class="wallet-label" data-i18n-text="Coins (crowns)">Монеты (кроны)</span><svg class="wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
    <defs><linearGradient id="crownMetal" x2=".8" y2="1"><stop stop-color="#ffe6a1"/><stop offset=".47" stop-color="#c99543"/><stop offset="1" stop-color="#855324"/></linearGradient></defs>
    <circle cx="16" cy="17" r="13" fill="#5a351b" stroke="#2e2115"/>
    <circle cx="16" cy="15.5" r="12.5" fill="url(#crownMetal)" stroke="#edc77e"/>
@@ -113,31 +115,31 @@ const grimBoot=(()=>{
    <path d="m9 12 3 2 4-5 4 5 3-2-2 7H11Zm2 9h10" fill="#965b28" stroke="#613813" stroke-linecap="round" stroke-linejoin="round"/>
    <path d="m10 12.7 2.2 1.7 3.8-4.6 3.8 4.6 2.2-1.7M12 18h8" fill="none" stroke="#ffe1a0" stroke-width=".8" stroke-linecap="round"/>
   </svg></dt><dd id="coins">—</dd></div>
-  <div><dt title="Влияние"><span class="wallet-label">Влияние</span><svg class="influence-icon wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg></dt><dd id="influence">—</dd></div>
+  <div><dt title="Влияние" data-i18n-title="Influence"><span class="wallet-label" data-i18n-text="Influence">Влияние</span><svg class="influence-icon wallet-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg></dt><dd id="influence">—</dd></div>
  </dl>
-</header><div id="questToast" role="status" aria-atomic="true"></div><div id="notice" role="status">Загружаем коллекцию…</div><button id="retry" hidden>Повторить запрос</button><section id="home">
+</header><div id="questToast" role="status" aria-atomic="true"></div><div id="notice" role="status" data-i18n-text="Loading your collection…">Загружаем коллекцию…</div><button id="retry" hidden data-i18n-text="Retry request">Повторить запрос</button><section id="home">
  <div class="deck-plaque">
   <i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i><i class="deck-corner" aria-hidden="true"></i>
   <img class="deck-emblem" src="/art/witcher-icon.png" width="72" height="72" alt="">
-  <h1>Ведьмак</h1>
- </div><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="drawRarity"></span><span id="newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled>Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
-<div class="spin-panel" aria-label="Пополнение бесплатных круток"><b id="free">Бесплатные: — из 5</b><small id="freeTimer">+1 каждые 3 часа</small></div>
+  <h1 data-i18n-text="The Witcher">Ведьмак</h1>
+ </div><div id="stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="drawRarity"></span><span id="newCardPanel" class="new-card-label" hidden data-i18n-text="New">Новая</span></div></div><div class="actions"><button class="primary" data-size="1" disabled data-i18n-text="Spin">Крутить</button><button data-size="10" disabled>×10</button><button data-size="50" disabled>×50</button></div>
+<div class="spin-panel" aria-label="Пополнение бесплатных круток" data-i18n-aria-label="Free spin refill"><b id="free" data-i18n-text="Free spins: — of 5">Бесплатные: — из 5</b><small id="freeTimer" data-i18n-text="+1 every 3 hours">+1 каждые 3 часа</small></div>
 <p id="drawBoost" class="boost-status" hidden></p>
-<section class="deck-tools" aria-label="Разделы колоды">
+<section class="deck-tools" aria-label="Разделы колоды" data-i18n-aria-label="Deck sections">
  <div class="deck-tools-grid">
-  <button type="button" data-tool="shuffle" aria-controls="tool-shuffle"><span aria-hidden="true">⤨</span>Перетасовка</button>
-  <button type="button" data-tool="craft" aria-controls="tool-craft"><span aria-hidden="true">⚒</span>Крафт</button>
-  <button type="button" data-tool="quests" aria-controls="tool-quests"><span aria-hidden="true">✦</span>Задания</button>
-  <button type="button" data-tool="rank" aria-controls="tool-rank"><span aria-hidden="true">♜</span>Топ</button>
+  <button type="button" data-tool="shuffle" aria-controls="tool-shuffle" data-i18n-text="Shuffle"><span aria-hidden="true">⤨</span>Перетасовка</button>
+  <button type="button" data-tool="craft" aria-controls="tool-craft" data-i18n-text="Crafting"><span aria-hidden="true">⚒</span>Крафт</button>
+  <button type="button" data-tool="quests" aria-controls="tool-quests" data-i18n-text="Quests"><span aria-hidden="true">✦</span>Задания</button>
+  <button type="button" data-tool="rank" aria-controls="tool-rank" data-i18n-text="Leaderboard"><span aria-hidden="true">♜</span>Топ</button>
  </div>
 </section>
-<details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Счётчик «Крутки» показывает все крутки в запасе, включая полученные за крафт и перетасовку. Монеты расходуются только на недостающие крутки. Пакет открывается целиком.</p><p id="drawChances">Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
-<details id="testPanel" hidden><summary>Панель тестировщика</summary><p id="testSpins">Тестовые крутки: —</p>
- <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearDust" class="danger" type="button" disabled>Обнулить пыль</button><button id="renewBoard" type="button" disabled>Обновить задания</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
+<details><summary data-i18n-text="Rules and odds">Правила и шансы</summary><p data-i18n-text="Get 1 free spin every 3 hours, up to 5. The spin counter includes every spin you have, including ones from crafting and shuffling. Crowns only cover the spins you are missing. Each pack opens in full.">+1 бесплатная крутка каждые 3 часа, максимум 5. Счётчик «Крутки» показывает все крутки в запасе, включая полученные за крафт и перетасовку. Монеты расходуются только на недостающие крутки. Пакет открывается целиком.</p><p id="drawChances" data-i18n-text="Common 34% · rare 27% · epic 21% · legendary 16% · mythic 2%. All cards of the same rarity are equally likely.">Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
+<details id="testPanel" hidden><summary data-i18n-text="Tester panel">Панель тестировщика</summary><p id="testSpins" data-i18n-text="Test spins: —">Тестовые крутки: —</p>
+ <div class="actions test-actions"><button type="button" data-grant="10" disabled data-i18n-text="+10 spins">+10 круток</button><button type="button" data-grant="50" disabled data-i18n-text="+50 spins">+50 круток</button><button id="resetShuffle" type="button" disabled data-i18n-text="Reset shuffle timer">Сбросить таймер перетасовки</button><button id="clearDust" class="danger" type="button" disabled data-i18n-text="Clear dust">Обнулить пыль</button><button id="renewBoard" type="button" disabled data-i18n-text="Refresh quests">Обновить задания</button><button id="clearCollection" class="danger" type="button" disabled data-i18n-text="Delete all cards">Удалить все карты</button></div>
 </details></section>
  <!-- tool pages -->
- <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden>
-  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Перетасовка</h1>
+ <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden data-i18n-aria-label="Shuffle">
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Deck">Колода</span></a><h1 data-i18n-text="Shuffle">Перетасовка</h1>
   <div id="shuffleScene" class="shuffle-scene" aria-hidden="true">
    <div class="shuffle-stack"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
    <div id="shuffleRing" class="shuffle-ring"></div>
@@ -145,22 +147,22 @@ const grimBoot=(()=>{
    <div id="shuffleContact" class="shuffle-contact"></div>
    <div id="shuffleReveal" class="shuffle-reveal" hidden></div>
   </div>
-  <button id="break" class="primary shuffle-button" type="button" disabled>Перетасовать</button>
-  <p id="breakInfo" class="shuffle-info">Награда зависит от мастерства.</p>
+  <button id="break" class="primary shuffle-button" type="button" disabled data-i18n-text="Shuffle">Перетасовать</button>
+  <p id="breakInfo" class="shuffle-info" data-i18n-text="Rewards depend on mastery.">Награда зависит от мастерства.</p>
   <p id="shuffleBoost" class="boost-status" hidden></p>
   <div id="breakResult" class="shuffle-result" role="status" hidden></div>
   <section class="shuffle-panel" aria-labelledby="masteryTitle">
-   <h2 id="masteryTitle">Мастерство перетасовки</h2>
-   <ol id="masterySteps" class="mastery-steps" aria-label="Уровни мастерства"><li>I</li><li>II</li><li>III</li><li>IV</li></ol>
-   <p id="masteryInfo">Загружаем мастерство…</p>
+   <h2 id="masteryTitle" data-i18n-text="Shuffle mastery">Мастерство перетасовки</h2>
+   <ol id="masterySteps" class="mastery-steps" aria-label="Уровни мастерства" data-i18n-aria-label="Mastery levels"><li>I</li><li>II</li><li>III</li><li>IV</li></ol>
+   <p id="masteryInfo" data-i18n-text="Loading mastery…">Загружаем мастерство…</p>
   </section>
   <section class="shuffle-panel" aria-labelledby="shuffleLootTitle">
-   <h2 id="shuffleLootTitle">Может выпасть</h2>
+   <h2 id="shuffleLootTitle" data-i18n-text="Possible rewards">Может выпасть</h2>
    <ul id="shuffleLoot" class="shuffle-loot"></ul>
   </section>
  </section>
- <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden>
-  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Крафт</h1>
+ <section id="tool-craft" class="deck-tool" aria-label="Крафт" hidden data-i18n-aria-label="Crafting">
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Deck">Колода</span></a><h1 data-i18n-text="Crafting">Крафт</h1>
   <div id="craftOverlay" class="craft-overlay" aria-hidden="true" hidden><div id="craftBench" class="craft-bench">
    <svg class="bench-tools" viewBox="0 0 300 170" preserveAspectRatio="none" aria-hidden="true">
     <g stroke-linecap="round" stroke-linejoin="round">
@@ -193,65 +195,139 @@ const grimBoot=(()=>{
    </svg>
    <div id="craftImpact" class="craft-impact"></div><div id="craftParticles" class="craft-particles"></div><div id="craftItem" class="craft-item" hidden></div>
   </div></div>
-  <p class="craft-hint">Передвинь ползунок, чтобы выбрать количество выполнений.</p>
-  <div class="craft-switch" role="group" aria-label="Разделы крафта">
-   <button type="button" id="craftSpinTab" aria-pressed="true" aria-controls="craftSpinList">Крутки</button>
-   <button type="button" id="craftBoostTab" aria-pressed="false" aria-controls="craftBoostList">Усилители</button>
+  <p class="craft-hint" data-i18n-text="Move the slider to set the crafting quantity.">Передвинь ползунок, чтобы выбрать количество выполнений.</p>
+  <div class="craft-switch" role="group" aria-label="Разделы крафта" data-i18n-aria-label="Crafting sections">
+   <button type="button" id="craftSpinTab" aria-pressed="true" aria-controls="craftSpinList" data-i18n-text="Spins">Крутки</button>
+   <button type="button" id="craftBoostTab" aria-pressed="false" aria-controls="craftBoostList" data-i18n-text="Boosters">Усилители</button>
   </div>
   <div id="craftSpinList" class="craft-list"></div>
   <div id="craftBoostList" class="craft-list" hidden></div>
-  <section class="craft-inventory" aria-labelledby="craftInventoryTitle"><h2 id="craftInventoryTitle">Инвентарь усилителей</h2><div id="craftInventory" class="craft-list"></div></section>
+  <section class="craft-inventory" aria-labelledby="craftInventoryTitle"><h2 id="craftInventoryTitle" data-i18n-text="Booster inventory">Инвентарь усилителей</h2><div id="craftInventory" class="craft-list"></div></section>
  </section>
- <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden>
-  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Доска объявлений</h1>
-  <p class="hunt-note">Новые объявления каждый день в 00:00 МСК</p>
-  <a id="questHunt" class="hunt-link" href="#battle" hidden>К охоте →</a>
-  <div class="quest-posting"><div class="quest-plaque" aria-hidden="true"><span>✦</span> ОБЪЯВЛЕНИЯ И ЗАКАЗЫ <span>✦</span></div><div id="questBoard" class="quest-board"></div></div>
+ <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden data-i18n-aria-label="Quests">
+  <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Deck">Колода</span></a><h1 data-i18n-text="Notice board">Доска объявлений</h1>
+  <p class="hunt-note" data-i18n-text="New notices daily at 00:00 MSK">Новые объявления каждый день в 00:00 МСК</p>
+  <a id="questHunt" class="hunt-link" href="#battle" hidden data-i18n-text="To the hunt →">К охоте →</a>
+  <div class="quest-posting"><div class="quest-plaque" aria-hidden="true" data-i18n-text="NOTICES AND CONTRACTS"><span>✦</span> ОБЪЯВЛЕНИЯ И ЗАКАЗЫ <span>✦</span></div><div id="questBoard" class="quest-board"></div></div>
  </section>
  <section id="battle" class="deck-tool" aria-labelledby="battleTitle" hidden>
-  <h1 id="battleTitle">Бой</h1>
+  <h1 id="battleTitle" data-i18n-text="Battle">Бой</h1>
   <div id="battleDeck" class="battle-table"></div>
-  <div class="hunt-actions"><button id="autoDeck" type="button" disabled>Автосбор</button><button id="resetDeck" type="button" disabled>Сброс</button></div>
-  <button class="hunt-wide" type="button" disabled>Бой в PvP</button><p class="hunt-note">Арена откроется в одном из следующих обновлений.</p>
-  <a class="hunt-link season-launch" href="#glory">✦ Слава · рейтинг арены →</a>
+  <div class="hunt-actions"><button id="autoDeck" type="button" disabled data-i18n-text="Auto-build">Автосбор</button><button id="resetDeck" type="button" disabled data-i18n-text="Reset">Сброс</button></div>
+  <button class="hunt-wide" type="button" disabled data-i18n-text="PvP battle">Бой в PvP</button><p class="hunt-note" data-i18n-text="The arena will open in a future update.">Арена откроется в одном из следующих обновлений.</p>
+  <a class="hunt-link season-launch" href="#glory" data-i18n-text="✦ Glory · arena rankings →">✦ Слава · рейтинг арены →</a>
   <div id="battleContract" class="battle-contract"></div>
  </section>
- <section id="hunt" class="deck-tool" aria-label="Охота" hidden>
-  <a class="deck-back" href="#battle">← Бой</a>
+ <section id="hunt" class="deck-tool" aria-label="Охота" hidden data-i18n-aria-label="Hunt">
+  <a class="deck-back" href="#battle" data-i18n-text="← Battle">← Бой</a>
   <div id="huntEnemy"></div><p id="huntIntent" class="hunt-intent" hidden></p><div id="huntDeck" class="battle-table"></div>
   <div id="huntOutcome" role="status" aria-atomic="true"></div>
-  <button id="strike" class="primary hunt-wide" type="button" disabled>Ударить</button>
+  <button id="strike" class="primary hunt-wide" type="button" disabled data-i18n-text="Strike">Ударить</button>
  </section>
  <section id="tool-rank" class="deck-tool season-view" aria-labelledby="topTitle" hidden>
- <a class="deck-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span>Колода</span></a>
- <div class="season-hero"><h1 id="topTitle">Топ сезона</h1>
+ <a class="deck-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Deck">Колода</span></a>
+ <div class="season-hero"><h1 id="topTitle" data-i18n-text="Season leaderboard">Топ сезона</h1>
   <div id="topSeason" class="season-period" hidden>
-   <div><span>Текущий сезон</span><strong id="topMonth"></strong></div>
-   <div><span>Окончание сезона</span><time id="topDeadline"><strong id="topEndDate"></strong><b id="topEndTime"></b></time></div>
+   <div><span data-i18n-text="Current season">Текущий сезон</span><strong id="topMonth"></strong></div>
+   <div><span data-i18n-text="Season ends">Окончание сезона</span><time id="topDeadline"><strong id="topEndDate"></strong><b id="topEndTime"></b></time></div>
   </div>
-  <a href="#profile" class="profile-link season-profile-link"><span>Мой профиль</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
+  <a href="#profile" class="profile-link season-profile-link"><span data-i18n-text="My profile">Мой профиль</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
  </div>
  <p id="topStatus" role="status"></p><ol id="topRows" class="season-rows"></ol>
 </section>
 <section id="glory" class="deck-tool season-view" aria-labelledby="gloryTitle" hidden>
- <a class="deck-back" href="#battle">← Бой</a>
- <div class="season-hero"><p class="season-kicker">АРЕНА · СЕЗОННЫЙ РЕЙТИНГ</p><h1 id="gloryTitle">Слава</h1><p>Арена пока закрыта. Здесь появятся места после первых PvP-боёв.</p></div>
- <div class="season-panel"><h2>Награды сезона</h2><p>Крутки получат только игроки на призовых местах арены: 1-е, 2–3-е, 4–5-е и 6–10-е. Влияние на награды не влияет.</p></div>
+ <a class="deck-back" href="#battle" data-i18n-text="← Battle">← Бой</a>
+ <div class="season-hero"><p class="season-kicker" data-i18n-text="ARENA · SEASON LEADERBOARD">АРЕНА · СЕЗОННЫЙ РЕЙТИНГ</p><h1 id="gloryTitle" data-i18n-text="Glory">Слава</h1><p data-i18n-text="The arena is closed for now. Rankings will appear after the first PvP battles.">Арена пока закрыта. Здесь появятся места после первых PvP-боёв.</p></div>
+ <div class="season-panel"><h2 data-i18n-text="Season rewards">Награды сезона</h2><p data-i18n-text="Only players in prize-winning arena placements receive spins: 1st, 2nd–3rd, 4th–5th and 6th–10th. Influence does not affect rewards.">Крутки получат только игроки на призовых местах арены: 1-е, 2–3-е, 4–5-е и 6–10-е. Влияние на награды не влияет.</p></div>
 </section>
 <section id="profile" class="deck-tool season-view" aria-labelledby="profileTitle" hidden>
- <a id="profileBack" class="deck-back" href="#tool-rank"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span>Топ</span></a>
+ <a id="profileBack" class="deck-back" href="#tool-rank"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Leaderboard">Топ</span></a>
  <p id="profileStatus" role="status"></p>
  <div id="profileContent" hidden>
   <div class="season-hero profile-hero">
    <div id="profilePortrait"></div><p id="profileRank" class="season-kicker"></p><h1 id="profileTitle"></h1><p id="profileUniverse"></p>
   </div>
   <div id="profileEditor" class="season-panel" hidden></div>
-  <div class="season-panel influence-panel"><h2><svg class="influence-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg>Влияние</h2><strong id="profileInfluence"></strong></div>
-  <section class="season-panel profile-stat-panel" aria-labelledby="profileStatsTitle"><h2 id="profileStatsTitle">Статистика</h2><dl id="profileStats" class="profile-stats"></dl></section>
-  <div id="profileAchievements" class="season-panel"><h2>Достижения</h2><ul id="profileMedals"></ul></div>
+  <div class="season-panel influence-panel"><h2 data-i18n-text="Influence"><svg class="influence-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#sigil-influence"/></svg>Влияние</h2><strong id="profileInfluence"></strong></div>
+  <section class="season-panel profile-stat-panel" aria-labelledby="profileStatsTitle"><h2 id="profileStatsTitle" data-i18n-text="Stats">Статистика</h2><dl id="profileStats" class="profile-stats"></dl></section>
+  <div id="profileAchievements" class="season-panel"><h2 data-i18n-text="Achievements">Достижения</h2><ul id="profileMedals"></ul></div>
  </div>
 </section>
-<section id="album" hidden><h1>Коллекция</h1><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1 id="packTitle">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="pack-face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="pack-drawRarity"></span><span id="pack-newCardPanel" class="new-card-label" hidden>Новая</span></div></div><div id="packRest" hidden><h2>Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
+<section id="settings" class="deck-tool settings-view" aria-labelledby="settings-title" hidden>
+ <a class="deck-back settings-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Deck">Колода</span></a>
+ <h1 id="settings-title" tabindex="-1" data-i18n-text="Settings">Настройки</h1>
+ <ul class="settings-menu">
+  <li><a href="#profile"><span class="setting-sigil" aria-hidden="true">♙</span><b data-i18n-text="Profile">Профиль</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+  <li><a href="#settings-motion"><span class="setting-sigil" aria-hidden="true">◈</span><b data-i18n-text="Animations">Анимации</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+  <li><a href="#settings-invite"><span class="setting-sigil" aria-hidden="true">✚</span><b data-i18n-text="Invite a friend">Пригласить друга</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+  <li><a href="#settings-history"><span class="setting-sigil" aria-hidden="true">▤</span><b data-i18n-text="Spin history">История круток</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+  <li><a href="#settings-language"><span class="setting-sigil" aria-hidden="true">◎</span><b data-i18n-text="Language">Язык</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+  <li><a href="#settings-guide"><span class="setting-sigil" aria-hidden="true">◇</span><b data-i18n-text="How to play">Как играть</b><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a></li>
+ </ul>
+ <article class="settings-panel premium-panel" aria-labelledby="premiumTitle">
+  <h2 id="premiumTitle"><span aria-hidden="true">✦</span> <span data-i18n-text="Premium">Премиум</span></h2>
+  <ul>
+   <li data-i18n-text="Double the chance of drawing a mythic card">Удвоенный шанс получить мифическую карту</li>
+   <li data-i18n-text="Free spins every 1.5 hours instead of 3">Бесплатные крутки каждые 1,5 часа вместо 3</li>
+   <li data-i18n-text="Shuffle every hour">Перетасовка каждый час</li>
+   <li data-i18n-text="Arena battle every hour instead of two (after the arena launches)">Бой на арене каждый час вместо двух (после запуска арены)</li>
+   <li data-i18n-text="Optional banner on your leaderboard row and profile">Баннер по желанию: в своей строке топа и в профиле</li>
+  </ul>
+  <p id="premiumNote" data-i18n-text="Premium is not available to purchase yet.">Оформление премиума пока недоступно.</p>
+  <button class="primary settings-wide" type="button" aria-describedby="premiumNote" disabled data-i18n-text="Get Premium">Оформить премиум</button>
+ </article>
+</section>
+<section id="settings-motion" class="deck-tool settings-view" aria-labelledby="settings-motion-title" hidden>
+ <a class="deck-back settings-back" href="#settings"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Settings">Настройки</span></a>
+ <h1 id="settings-motion-title" tabindex="-1" data-i18n-text="Animations">Анимации</h1>
+ <div class="settings-panel">
+  <p data-i18n-text="Turn animations off to show results immediately. This does not change sound. The game also respects your device’s reduced motion setting.">Без анимаций результат показывается сразу. Звук не меняется. Игра также учитывает системную настройку уменьшения движения.</p>
+  <div class="settings-options"><button type="button" data-motion-choice="on" data-i18n-text="On">Включены</button><button type="button" data-motion-choice="off" data-i18n-text="Off">Выключены</button></div>
+ </div>
+</section>
+<section id="settings-invite" class="deck-tool settings-view" aria-labelledby="settings-invite-title" hidden>
+ <a class="deck-back settings-back" href="#settings"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Settings">Настройки</span></a>
+ <h1 id="settings-invite-title" tabindex="-1" data-i18n-text="Invite a friend">Пригласить друга</h1>
+ <div class="settings-panel">
+  <p data-i18n-text="You earn five spins when a new player joins with your link and completes their first spin. One reward per friend. Closed beta access rules still apply.">Ты получишь пять круток, когда новый игрок зайдёт по твоей ссылке и сделает первую крутку. Награда выдаётся один раз за друга. Правила доступа к закрытой бете не меняются.</p>
+  <p><span data-i18n-text="Qualified friends:">Засчитано друзей:</span> <strong id="referralCount">—</strong></p>
+  <p id="referralStatus" role="status"></p>
+  <div id="referralActions" hidden>
+   <label for="referralURL" data-i18n-text="Your invite link">Твоя ссылка</label><input id="referralURL" type="url" readonly>
+   <div class="settings-options"><button id="copyReferral" type="button" data-i18n-text="Copy link">Копировать</button><button id="shareReferral" type="button" data-i18n-text="Share">Поделиться</button></div>
+  </div>
+ </div>
+</section>
+<section id="settings-history" class="deck-tool settings-view" aria-labelledby="settings-history-title" hidden>
+ <a class="deck-back settings-back" href="#settings"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Settings">Настройки</span></a>
+ <h1 id="settings-history-title" tabindex="-1" data-i18n-text="Spin history">История круток</h1>
+ <div class="settings-panel history-panel">
+  <p><span data-i18n-text="Spins recorded:">Круток в истории:</span> <strong id="historyTotal">—</strong></p>
+  <p data-i18n-text="Only recorded openings are shown. Some older records have no date.">Показаны только сохранённые открытия. У некоторых старых записей нет даты.</p>
+  <p id="historyStatus" role="status"></p>
+  <div id="spinHistory"></div><button id="historyMore" class="settings-wide" type="button" hidden data-i18n-text="Show more">Показать ещё</button>
+ </div>
+</section>
+<section id="settings-language" class="deck-tool settings-view" aria-labelledby="settings-language-title" hidden>
+ <a class="deck-back settings-back" href="#settings"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Settings">Настройки</span></a>
+ <h1 id="settings-language-title" tabindex="-1" data-i18n-text="Language">Язык</h1>
+ <div class="settings-panel">
+  <div class="settings-options"><button type="button" lang="ru" data-language="ru">Русский</button><button type="button" lang="en" data-language="en">English</button></div>
+ </div>
+</section>
+<section id="settings-guide" class="deck-tool settings-view" aria-labelledby="settings-guide-title" hidden>
+ <a class="deck-back settings-back" href="#settings"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Settings">Настройки</span></a>
+ <h1 id="settings-guide-title" tabindex="-1" data-i18n-text="How to play">Как играть</h1>
+ <ol class="settings-guide">
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><rect x="6" y="3" width="13" height="18" rx="2"/><path d="M3 6v13m7-7 2.5-3.5L15 12l-2.5 3.5z"/></svg></span><div><h2 data-i18n-text="Spins & rarity">Крутки и редкость</h2><p data-i18n-text="Open 1, 10 or 50 cards. Free and earned spins are spent before crowns. Mythic cards are the rarest.">Открывай по 1, 10 или 50 карт. Сначала расходуются бесплатные и заработанные крутки, потом кроны. Мифические карты — самые редкие.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 6C8 3 5 4 3 5v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-2-1-5-2-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg></span><div><h2 data-i18n-text="Collection">Коллекция</h2><p data-i18n-text="Tap a card to see its stats. New cards fill the album; duplicates can be used in crafting.">Открой карту, чтобы увидеть её характеристики. Новые карты пополняют альбом, а повторки пригодятся для крафта.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="m9 9 11 11-2 2L7 11m-4 1L2 9l7-7 4 2 2 4-4 4-3-3z"/></svg></span><div><h2 data-i18n-text="Shuffle & crafting">Перетасовка и крафт</h2><p data-i18n-text="Shuffling yields dust or a random reward. Crafting trades dust and duplicates for spins and boosters.">Перетасовка приносит пыль или случайную награду. В крафте меняй пыль и повторки на крутки и усилители.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 3h14v18l-3-1-4 1-4-1-3 1V3zm3 5h8m-8 4h8m-8 4h5"/></svg></span><div><h2 data-i18n-text="Tasks & contracts">Задания и заказы</h2><p data-i18n-text="Complete tasks on the board. Take a contract, build a battle deck, and defeat the monster for a reward.">Выполняй задания на доске. Возьми заказ, собери боевую колоду и победи чудовище, чтобы получить награду.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="m4 4 4 1 12 13m-5 2 5-5m-2 3 3 3M20 4l-4 1-5 5m-3 3-4 5m0-3 5 5m-3-2-3 3"/></svg></span><div><h2 data-i18n-text="Battle deck">Боевая колода</h2><p data-i18n-text="Choose up to six cards for a hunt and watch which card the monster is targeting. The PvP arena is not open yet.">Выбери до шести карт для охоты и следи, по какой карте ударит чудовище. Арена PvP пока закрыта.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v16m-4 2h8M5 7h14M5 7l-3 6h6L5 7zm14 0-3 6h6l-3-6z"/></svg></span><div><h2 data-i18n-text="Influence & seasons">Влияние и сезоны</h2><p data-i18n-text="Spins, tasks, and contracts move you up the seasonal leaderboard. At midnight Moscow time on the first day of the month, your collection and influence reset. Spins, dust, crowns and boosters carry over.">Крутки, задания и заказы поднимают тебя в сезонном топе. Первого числа в 00:00 МСК коллекция и влияние сбрасываются; крутки, пыль, кроны и усилители остаются.</p></div></li>
+ </ol>
+</section>
+<section id="album" hidden><h1 data-i18n-text="Collection">Коллекция</h1><div id="albumGrid"></div></section><section id="pack" hidden><a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Deck">Колода</span></a><h1 id="packTitle" data-i18n-text="Results">Результаты</h1><div id="pack-stage" class="draw-stage"><div class="stack" aria-hidden="true"></div><div class="contact" aria-hidden="true"></div><div id="pack-card" class="draw-card"><i class="paper-edge" aria-hidden="true"></i><div class="back" aria-hidden="true"></div><button type="button" id="pack-face" class="front" hidden></button></div><div class="draw-result" role="status" aria-atomic="true"><span id="pack-drawRarity"></span><span id="pack-newCardPanel" class="new-card-label" hidden data-i18n-text="New">Новая</span></div></div><div id="packRest" hidden><h2 data-i18n-text="Other cards">Остальные карты</h2><div class="grid" id="packGrid"></div><p id="summary"></p></div></section>
 <section id="detail" class="card-view" aria-labelledby="detailTitle" hidden>
  <div id="detailArt" class="card-view-art"></div>
  <div class="card-view-copy">
@@ -260,6 +336,6 @@ const grimBoot=(()=>{
   <p id="detailLore" class="card-view-lore"></p>
   <dl id="detailStats" class="card-view-stats"></dl>
  </div>
- <div class="card-view-actions"><button id="detailBack" type="button"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 7-7m-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Вернуться</span></button></div>
+ <div class="card-view-actions"><button id="detailBack" type="button"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 7-7m-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Go back">Вернуться</span></button></div>
 </section>
-<nav aria-label="Разделы"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span>Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span>Коллекция</span></a><a href="#battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 3 .5L20 18m-4 2 4-4m-2 2 3 3M20 4l-3 .5L4 18m0-2 4 4m-2-2-3 3"/></svg><span>Бой</span></a></nav></main><dialog id="deckPicker" aria-labelledby="deckPickerTitle"><h2 id="deckPickerTitle">Выбор карты</h2><form method="dialog"><button value="cancel" autofocus>Закрыть</button></form><div id="deckChoices"></div></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog><dialog id="dustConfirm" aria-labelledby="dustConfirmTitle"><h2 id="dustConfirmTitle">Обнулить пыль?</h2><p>Вся пыль исчезнет. Карты, крутки и кроны останутся.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Обнулить пыль</button></form></dialog></body></html>
+<nav aria-label="Разделы" data-i18n-aria-label="Sections"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span data-i18n-text="Deck">Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span data-i18n-text="Collection">Коллекция</span></a><a href="#battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 3 .5L20 18m-4 2 4-4m-2 2 3 3M20 4l-3 .5L4 18m0-2 4 4m-2-2-3 3"/></svg><span data-i18n-text="Battle">Бой</span></a></nav></main><dialog id="deckPicker" aria-labelledby="deckPickerTitle"><h2 id="deckPickerTitle" data-i18n-text="Choose a card">Выбор карты</h2><form method="dialog"><button value="cancel" autofocus data-i18n-text="Close">Закрыть</button></form><div id="deckChoices"></div></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle" data-i18n-text="Delete all cards?">Удалить все карты?</h2><p data-i18n-text="All cards and duplicates will be removed from your collection. You will not receive dust. This cannot be undone.">Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus data-i18n-text="Cancel">Отмена</button><button class="danger" value="clear" data-i18n-text="Delete all cards">Удалить все карты</button></form></dialog><dialog id="dustConfirm" aria-labelledby="dustConfirmTitle"><h2 id="dustConfirmTitle" data-i18n-text="Clear dust?">Обнулить пыль?</h2><p data-i18n-text="You will lose all your dust but keep your cards, spins and crowns.">Вся пыль исчезнет. Карты, крутки и кроны останутся.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus data-i18n-text="Cancel">Отмена</button><button class="danger" value="clear" data-i18n-text="Clear dust">Обнулить пыль</button></form></dialog></body></html>
