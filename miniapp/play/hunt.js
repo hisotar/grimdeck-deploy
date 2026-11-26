@@ -34,6 +34,7 @@ const HuntUI=(()=>{
    const isHunt=q.kind==='hunt', complete=!isHunt&&q.goal===q.progress;
    const paper=node('article',undefined,`quest-paper ${isHunt?'quest-contract':'quest-task'}`);
    paper.dataset.quest=q.id;
+   if(complete)paper.classList.add('quest-complete');
    paper.append(node('small',isHunt?'ЗАКАЗ НА ЧУДОВИЩЕ':'ЕЖЕДНЕВНОЕ ЗАДАНИЕ'),node('h2',q.name??titles[q.kind]),node('b',`◉ ${q.reward} ${q.reward===1?'крона':q.reward<5?'кроны':'крон'}`,'quest-pay'));
    if(isHunt){
     paper.append(button(state.contract?'Уже взят заказ':'Сорвать заказ',()=>transact('take-contract',0,1,{contract:q.id}),blocked||!!state.contract));
@@ -75,18 +76,22 @@ const HuntUI=(()=>{
   const next=Array.from({length:6},(_,i)=>(i<3?front[i]:rear[i-3])??null);
   transact('save-deck',0,1,{slots:next});
  }
- function table(el, units, editable, blocked){
+ function table(el, units, editable, blocked, target){
   el.replaceChildren(...['Фронт · защита','Тыл · атака'].map((title,row)=>{
    const band=node('div',undefined,'battle-band');
-   band.append(node('h2',title));
+   const label=node('h2',title);label.dataset.emblem=row?'✦':'⬟';band.append(label);
    const grid=node('div',undefined,'battle-slots');
    for(let i=row*3;i<row*3+3;i++){
     const unit=units[i], cid=editable?unit:unit?.id, c=cards.get(cid);
     const el=editable?button(undefined,()=>pick(i),blocked):node('div');
     el.classList.add('battle-slot');el.dataset.slot=i;
     if(c){
-     el.append(cardPortrait(cid,true),node('b',c[1]),node('small',`⚔ ${i<3?Math.ceil(c[3]/2):c[3]} · ♥ `));
-     el.lastChild.append(node('span',editable?c[4]:unit.hp,'unit-hp'));
+     const stats=node('small',undefined,'battle-stats');
+     const atk=editable?c[3]:unit.atk;
+     const attack=node('span',`⚔ ${i<3?Math.ceil(atk/2):atk}`,'slot-atk');
+     const health=node('span','♥ ','slot-hp');health.append(node('b',editable?c[4]:unit.hp,'unit-hp'));
+     stats.append(attack,health);el.append(cardPortrait(cid,true),node('b',c[1]),stats);
+     if(i===target)el.classList.add('counter-target');
      if(!editable&&!unit.hp)el.classList.add('defeated');
     }else el.append(node('span',editable?'+':'—','slot-empty'));
     if(editable)el.setAttribute('aria-label',`${title}, слот ${i%3+1}: ${c?.[1]??'выбрать карту'}`);
@@ -109,7 +114,7 @@ const HuntUI=(()=>{
  function render(blocked){
   if(animating)return;
   const fight=state?.fight, contract=state?.contract;
-  const signature=JSON.stringify([state?.board,state?.deck,contract,fight,blocked,!!state,Object.keys(state?.owned??{}),art.size]);
+  const signature=JSON.stringify([state?.board,state?.deck,contract,fight,huntTarget,blocked,!!state,Object.keys(state?.owned??{}),art.size]);
   if(signature===renderKey)return;
   renderKey=signature;
   board(blocked);
@@ -132,10 +137,16 @@ const HuntUI=(()=>{
    }
   }
   const strike=$('strike');strike.hidden=!fight||fight.status!=='active';strike.disabled=blocked||strike.hidden;
+  const intent=$('huntIntent');intent.hidden=true;intent.textContent='';
   $('huntEnemy').replaceChildren();$('huntDeck').replaceChildren();$('huntOutcome').textContent='';
   if(fight){
    $('huntEnemy').append(enemy(fight.monster));
-   table($('huntDeck'),fight.units,false,true);
+   table($('huntDeck'),fight.units,false,true,huntTarget);
+   if(Number.isInteger(huntTarget)&&fight.status==='active'){
+    const name=cards.get(fight.units[huntTarget]?.id)?.[1]??'карта';
+    const tactic=fight.monster.tactic==='rear'?'Целится в тыл':'Давит на фронт';
+    intent.hidden=false;intent.textContent=`${tactic} · ответ по ${huntTarget<3?'фронту':'тылу'}: ${name} · ${fight.monster.atk} урона`;
+   }
    strike.textContent=`Ударить · осталось ${3-fight.turn} из 3`;
    if(fight.status!=='active')outcome(fight);
   }else $('huntOutcome').textContent=state?'Нет начатой охоты.':'Загружаем охоту…';
@@ -153,6 +164,11 @@ const HuntUI=(()=>{
   if(navigation===version&&targetPane()==='hunt'){
    history.replaceState(null,'','#battle');await route();
   }
+ }
+ function impact(target, counter, damage){
+  const fx=node('span',undefined,`hunt-impact ${counter?'hunt-impact-counter':''}`);
+  fx.setAttribute('aria-hidden','true');fx.append(node('b',`−${damage}`));target.append(fx);
+  setTimeout(()=>fx.remove(),440);
  }
  async function apply(out, op, prior){
   if(op.kind==='take-contract'){
@@ -179,17 +195,29 @@ const HuntUI=(()=>{
      const el=$('huntDeck').querySelector(`[data-slot="${event.slot}"]`), monster=$('huntEnemy').firstElementChild;
      if(!el||!monster)break;
      const counter=event.unitHp!==undefined;
+     const mover=counter?monster:el, target=counter?(el.querySelector('.card-portrait')||el):monster;
+     let contact='none', approach;
      if(!motion.matches){
-      const a=el.getBoundingClientRect(), b=monster.getBoundingClientRect();
+      const a=mover.getBoundingClientRect(), b=target.getBoundingClientRect();
       const x=b.left+b.width/2-a.left-a.width/2, y=b.top+b.height/2-a.top-a.height/2;
-      const mover=counter?monster:el;
-      const lift=counter?`translate(${-.30*x}px,${-.30*y}px) scale(.95)`:`translate(${x}px,${y}px) scale(.76)`;
-      const flight=mover.animate?.([{transform:'none',zIndex:3},{transform:lift,zIndex:3,offset:.55},{transform:'none',zIndex:3}],{duration:counter?240:360,easing:'ease-in-out'});
-      await flight?.finished.catch(()=>{});
+      contact=`translate(${x}px,${y}px) scale(${counter ? .36 : .82})`;
+      approach=mover.animate?.([
+       {transform:'none',zIndex:6},
+       {transform:`translate(${-x*.04}px,${counter?-9:8}px) rotate(${counter?4:-5}deg)`,zIndex:6,offset:.32},
+       {transform:contact,zIndex:6}
+      ],{duration:counter?235:200,fill:'forwards',easing:'cubic-bezier(.56,.04,.73,.68)'});
+      await approach?.finished.catch(()=>{});
      }
+     approach?.cancel();
      if(navigation!==version||targetPane()!=='hunt')break;
      if(counter){el.querySelector('.unit-hp').textContent=event.unitHp;el.classList.toggle('defeated',!event.unitHp);}
      else monster.querySelector('.enemy-hp').textContent=event.monsterHp;
+     impact(target,counter,event.damage);
+     DrawSound.cue(counter?'hunt-counter':'hunt-hit');
+     if(!motion.matches){
+      target.animate?.([{transform:'none'},{transform:`translate(${counter?4:-4}px,${counter?5:-3}px) rotate(${counter?4:-2}deg)`,offset:.22},{transform:'none'}],{duration:210});
+      await mover.animate?.([{transform:contact,zIndex:6},{transform:'none',zIndex:6}],{duration:counter?240:160,easing:'ease-out'}).finished.catch(()=>{});
+     }else await pause(95);
     }
    }finally{animating=false;renderKey='';refresh();}
    showRewards(out.questRewards);

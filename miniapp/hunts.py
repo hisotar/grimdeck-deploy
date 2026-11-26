@@ -14,15 +14,21 @@ MONSTERS = (
     ('Брукса', None, 3), ('Леший', 'WIT_R03', 3), ('Вилохвост', None, 2),
     ('Грифон', 'WIT_R01', 2),
 )
+REAR_HUNTERS = {'Полуденница', 'Полуночница', 'Катакан', 'Брукса', 'Вилохвост', 'Грифон'}
 ACTIONS = {'take-contract': 'contract', 'save-deck': 'slots', 'start-hunt': 'contract',
            'strike': 'turn'}
 
 
-def board_for(state, uid, now):
+def board_for(state, uid, now, *, renew=False):
     day = (now + MOSCOW) // DAY
-    if state.get('board', {}).get('day') == day:
+    previous = state.get('board', {})
+    same_day = previous.get('day') == day
+    if same_day and not renew:
         return
-    seed = hashlib.sha256(f'grimdeck-board-v1:{day}:{uid}'.encode()).digest()
+    generation = previous.get('generation', 0) + 1 if same_day else 0
+    suffix = f':{generation}' if generation else ''
+    notice_id = f'{day}{suffix}'
+    seed = hashlib.sha256(f'grimdeck-board-v1:{day}:{uid}{suffix}'.encode()).digest()
     rng = random.Random(seed)
     count = rng.randint(3, 6)
     actions = ['draw', 'craft', 'break']
@@ -35,14 +41,16 @@ def board_for(state, uid, now):
         goals = [n for n in range(1, limits[kind] + 1)
                  if not any(q['kind'] == kind and q['goal'] == n for q in notices)]
         goal = rng.choice(goals)
-        notices.append(dict(id=f'{day}:task:{i}', kind=kind, goal=goal, progress=0,
+        notices.append(dict(id=f'{notice_id}:task:{i}', kind=kind, goal=goal, progress=0,
                             reward=1 + goal // 2))
-    for i in rng.sample(range(len(MONSTERS)), 2):
+    old_hunts = {q['name'] for q in previous['notices'] if q['kind'] == 'hunt'} if renew and same_day else set()
+    pool = [i for i, (name, _, _) in enumerate(MONSTERS) if name not in old_hunts]
+    for i in rng.sample(pool, 2):
         name, art, tier = MONSTERS[i]
-        notices.append(dict(id=f'{day}:hunt:{i}', kind='hunt', name=name, art=art,
+        notices.append(dict(id=f'{notice_id}:hunt:{i}', kind='hunt', name=name, art=art,
                             tier=tier, reward=2 + tier, taken=False))
     rng.shuffle(notices)
-    state['board'] = dict(day=day, resetsAt=(day + 1) * DAY - MOSCOW, notices=notices)
+    state['board'] = dict(day=day, generation=generation, resetsAt=(day + 1) * DAY - MOSCOW, notices=notices)
 
 
 def award(state, quest):
@@ -58,6 +66,14 @@ def progress(state, kind, count):
             if quest['progress'] == quest['goal']:
                 rewards.append(award(state, quest))
     return rewards
+
+
+def counter_target(fight):
+    if not fight or fight['status'] != 'active':
+        return None
+    units = fight['units']
+    order = (3, 4, 5, 0, 1, 2) if fight['monster'].get('tactic') == 'rear' else range(6)
+    return next((i for i in order if units[i] and units[i]['hp']), None)
 
 
 def action(state, cards, kind, params):
@@ -99,6 +115,7 @@ def action(state, cards, kind, params):
         tier = contract['tier']
         hp = (5 + tier * 2) if count == 1 else count * (6 + tier)
         monster = {**contract, 'hp': hp, 'maxHp': hp, 'atk': min(2, tier) if count == 1 else tier + 1}
+        monster['tactic'] = 'rear' if contract['name'] in REAR_HUNTERS else 'front'
         state['fight'] = dict(id=contract_id, turn=0, status='active', units=units, monster=monster)
         return 200, {'started': contract_id}
     if (not contract or not fight or fight['status'] != 'active' or fight['id'] != contract_id
@@ -115,8 +132,7 @@ def action(state, cards, kind, params):
         if not monster['hp']:
             break
     if monster['hp']:
-        # Front slots come first; only a wholly defeated front exposes the rear.
-        target = next((i for i, unit in enumerate(units) if unit and unit['hp']), None)
+        target = counter_target(fight)
         if target is not None:
             unit = units[target]
             unit['hp'] = max(0, unit['hp'] - monster['atk'])

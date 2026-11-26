@@ -346,6 +346,53 @@ class FullGame(unittest.TestCase):
         self.assertTrue(all(q.get('progress', 0)==0 for q in state['board']['notices']))
         self.assertEqual(self.run_play('take-contract', 3, uid='C', now=midnight, contract=a['id'])[0], 409)
 
+    def test_tester_renew_board_and_clear_dust_preserve_other_state(self):
+        self.seed(dust=480, coins=31, owned={'WIT_C01':1}, deck=['WIT_C01']+[None]*5)
+        before = self.run_play('state')[1]['state']
+        old_board = before['board']
+        contract = next(q for q in old_board['notices'] if q['kind']=='hunt')['id']
+        self.assertEqual(self.run_play('take-contract', 1, contract=contract)[0], 200)
+        self.assertEqual(self.run_play('start-hunt', 2, contract=contract)[0], 200)
+        before = self.run_play('state')[1]['state']
+        status, changed = self.run_play('renew-board', 3)
+        new_board = changed['state']['board']
+        self.assertEqual((status, changed['state']), (200, {**before, 'board':new_board}))
+        self.assertEqual(new_board['resetsAt'], old_board['resetsAt'])
+        self.assertIn(len(new_board['notices']), range(3, 7))
+        self.assertTrue({q['id'] for q in old_board['notices']}.isdisjoint(q['id'] for q in new_board['notices']))
+        self.assertTrue({q['name'] for q in old_board['notices'] if q['kind']=='hunt'}.isdisjoint(
+                        q['name'] for q in new_board['notices'] if q['kind']=='hunt'))
+        self.assertEqual(self.run_play('renew-board', 3)[1]['state']['board'], new_board)
+        status, cleared = self.run_play('clear-dust', 4)
+        self.assertEqual((status, cleared['dustRemoved'], cleared['state']),
+                         (200, 480, {**changed['state'], 'dust':0}))
+        later = self.run_play('renew-board', 5)[1]['state']
+        self.assertNotEqual(later['board'], new_board)
+        self.assertEqual(self.run_play('renew-board', 3)[1]['state'], later)
+        with patch.object(game.secrets, 'randbelow', side_effect=[0, 9999]):
+            earned = self.run_play('break', 6)[1]['state']
+        self.assertEqual(earned['dust'], 1)
+        self.assertEqual(self.run_play('clear-dust', 4)[1]['state'], earned)
+        self.assertEqual(self.run_play('state', uid='B')[1]['state']['dust'], 0)
+
+    def test_rear_tactic_uses_server_preview_and_falls_back_to_front(self):
+        contract = dict(id='gryphon', name='Грифон', tier=2, reward=4)
+        self.seed(contract=contract, owned={'WIT_C01':1, 'WIT_C02':1},
+                  deck=['WIT_C01',None,None,'WIT_C02',None,None])
+        status, out = self.run_play('start-hunt', 1, contract=contract['id'])
+        self.assertEqual((status, out['huntTarget'], out['state']['fight']['monster']['tactic']), (200, 3, 'rear'))
+        fight = out['state']['fight']
+        fight['monster']['hp'] = 999
+        fight['units'][3]['hp'] = 1
+        saved = {**out['state'], 'fight':fight}
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE players SET state=? WHERE uid=?', (json.dumps(saved), 'A'))
+        status, next_round = self.run_play('strike', 2, contract=contract['id'], turn=0)
+        self.assertEqual((status, next_round['strike']['events'][-1]['slot'], next_round['huntTarget']), (200, 3, 0))
+        self.assertEqual(self.run_play('state')[1]['huntTarget'], 0)
+        _, last = self.run_play('strike', 3, contract=contract['id'], turn=1)
+        self.assertEqual(last['strike']['events'][-1]['slot'], 0)
+
     def test_batches_and_multiple_daily_rewards_once(self):
         board = dict(day=1, resetsAt=2*game.DAY-game.hunts.MOSCOW, notices=[
             dict(id='a', kind='craft', goal=1, progress=0, reward=2),

@@ -85,6 +85,10 @@ window.DrawSound = (() => {
     noise(at,.062,.36,185,1900,.03,9);
     noise(at+.002,.031,.21,2400,6600,.035,9);
     tone(at,510+55*variant,.116,.09,'triangle',420);
+   }else if(name==='hunt-hit'||name==='hunt-counter'){
+    const heavy=name==='hunt-counter';
+    noise(at,heavy ? .15 : .07,heavy ? .30 : .17,heavy?125:280,heavy?1700:3100,.04,6);
+    tone(at,heavy?135:345,.13,.08,'triangle',heavy?62:176);
    }else if(name==='forge-ready'){
     tone(at,523.25,.22,.10,'triangle');tone(at+.056,783.99,.27,.08);
    }else if(name==='shuffle-lift'){

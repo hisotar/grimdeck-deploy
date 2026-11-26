@@ -52,7 +52,8 @@ MAX_FREE_SPINS = 5
 PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
-TEST_ACTIONS = {'grant': GRANT_SIZES, 'clear-collection': (0,), 'reset-shuffle': (0,)}
+TEST_ACTIONS = {'grant': GRANT_SIZES, 'clear-collection': (0,), 'reset-shuffle': (0,),
+                'clear-dust': (0,), 'renew-board': (0,)}
 # Recipe IDs are stable: the operation journal also uses them on retries.
 CRAFT_RECIPES = {
     1: dict(material='dust', cost=10, spins=1),
@@ -120,7 +121,7 @@ def play(db, uid, kind, data, bonus, now):
         return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
                                         weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES,
-                    maxCraftBatch=MAX_CRAFT_BATCH)
+                    maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')))
 
     def spend_boost(boost, units):
         left = active.get(boost, 0)
@@ -225,6 +226,12 @@ def play(db, uid, kind, data, bonus, now):
         state['deck'] = [None] * 6
     elif kind == 'reset-shuffle':
         state['lastBreak'] = 0
+        result = {}
+    elif kind == 'clear-dust':
+        result = dict(dustRemoved=state['dust'])
+        state['dust'] = 0
+    elif kind == 'renew-board':
+        hunts.board_for(state, uid, now, renew=True)
         result = {}
     else:
         if state['lastBreak'] and now < state['lastBreak'] + SHUFFLE_COOLDOWN:

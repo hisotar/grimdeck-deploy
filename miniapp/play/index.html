@@ -40,7 +40,7 @@
 </section>
 <details><summary>Правила и шансы</summary><p>+1 бесплатная крутка каждые 3 часа, максимум 5. Счётчик «Крутки» показывает все крутки в запасе, включая полученные за крафт и перетасовку. Монеты расходуются только на недостающие крутки. Пакет открывается целиком.</p><p id="drawChances">Обычная 34% · редкая 27% · эпическая 21% · легендарная 16% · мифическая 2%. Внутри редкости шансы карт равны.</p></details>
 <details id="testPanel" hidden><summary>Панель тестировщика</summary><p id="testSpins">Тестовые крутки: —</p>
- <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
+ <div class="actions test-actions"><button type="button" data-grant="10" disabled>+10 круток</button><button type="button" data-grant="50" disabled>+50 круток</button><button id="resetShuffle" type="button" disabled>Сбросить таймер перетасовки</button><button id="clearDust" class="danger" type="button" disabled>Обнулить пыль</button><button id="renewBoard" type="button" disabled>Обновить задания</button><button id="clearCollection" class="danger" type="button" disabled>Удалить все карты</button></div>
 </details></section>
  <!-- tool pages -->
  <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden>
@@ -100,7 +100,7 @@
    </svg>
    <div id="craftImpact" class="craft-impact"></div><div id="craftParticles" class="craft-particles"></div><div id="craftItem" class="craft-item" hidden></div>
   </div></div>
-  <p class="craft-hint">Можно создать сразу или указать количество выполнений.</p>
+  <p class="craft-hint">Передвинь ползунок, чтобы выбрать количество выполнений.</p>
   <div class="craft-switch" role="group" aria-label="Разделы крафта">
    <button type="button" id="craftSpinTab" aria-pressed="true" aria-controls="craftSpinList">Крутки</button>
    <button type="button" id="craftBoostTab" aria-pressed="false" aria-controls="craftBoostList">Усилители</button>
@@ -113,7 +113,7 @@
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Колода</span></a><h1>Доска объявлений</h1>
   <p class="hunt-note">Новые объявления каждый день в 00:00 МСК</p>
   <a id="questHunt" class="hunt-link" href="#battle" hidden>К охоте →</a>
-  <div id="questBoard" class="quest-board"></div>
+  <div class="quest-posting"><div class="quest-plaque" aria-hidden="true"><span>✦</span> ОБЪЯВЛЕНИЯ И ЗАКАЗЫ <span>✦</span></div><div id="questBoard" class="quest-board"></div></div>
  </section>
  <section id="battle" class="deck-tool" aria-labelledby="battleTitle" hidden>
   <h1 id="battleTitle">Бой</h1>
@@ -124,7 +124,7 @@
  </section>
  <section id="hunt" class="deck-tool" aria-label="Охота" hidden>
   <a class="deck-back" href="#battle">← Бой</a>
-  <div id="huntEnemy"></div><div id="huntDeck" class="battle-table"></div>
+  <div id="huntEnemy"></div><p id="huntIntent" class="hunt-intent" hidden></p><div id="huntDeck" class="battle-table"></div>
   <div id="huntOutcome" role="status" aria-atomic="true"></div>
   <button id="strike" class="primary hunt-wide" type="button" disabled>Ударить</button>
  </section>
@@ -141,4 +141,4 @@
  </div>
  <div class="card-view-actions"><button id="detailBack" type="button"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 7-7m-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Вернуться</span></button></div>
 </section>
-<nav aria-label="Разделы"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span>Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span>Коллекция</span></a><a href="#battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 3 .5L20 18m-4 2 4-4m-2 2 3 3M20 4l-3 .5L4 18m0-2 4 4m-2-2-3 3"/></svg><span>Бой</span></a></nav></main><dialog id="deckPicker" aria-labelledby="deckPickerTitle"><h2 id="deckPickerTitle">Выбор карты</h2><form method="dialog"><button value="cancel" autofocus>Закрыть</button></form><div id="deckChoices"></div></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog></body></html>
+<nav aria-label="Разделы"><a href="#home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM4 7v14m16-18v14M9 12l3-4 3 4-3 4z"/></svg><span>Колода</span></a><a href="#album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg><span>Коллекция</span></a><a href="#battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 3 .5L20 18m-4 2 4-4m-2 2 3 3M20 4l-3 .5L4 18m0-2 4 4m-2-2-3 3"/></svg><span>Бой</span></a></nav></main><dialog id="deckPicker" aria-labelledby="deckPickerTitle"><h2 id="deckPickerTitle">Выбор карты</h2><form method="dialog"><button value="cancel" autofocus>Закрыть</button></form><div id="deckChoices"></div></dialog><dialog id="clearConfirm" aria-labelledby="clearTitle"><h2 id="clearTitle">Удалить все карты?</h2><p>Все карты и копии исчезнут из твоей коллекции. Пыль не начислится. Отменить удаление нельзя.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Удалить все карты</button></form></dialog><dialog id="dustConfirm" aria-labelledby="dustConfirmTitle"><h2 id="dustConfirmTitle">Обнулить пыль?</h2><p>Вся пыль исчезнет. Карты, крутки и кроны останутся.</p><form class="confirm-actions" method="dialog"><button value="cancel" autofocus>Отмена</button><button class="danger" value="clear">Обнулить пыль</button></form></dialog></body></html>
