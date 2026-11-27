@@ -265,7 +265,7 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
                     maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')),
                     seasonEndsAt=ends, spinInfluence=seasons.SPIN_INFLUENCE,
                     drawOdds=dict(base=DRAW_WEIGHTS, boosted=BOOSTED_DRAW_WEIGHTS),
-                    huntPortraits=hunts.PORTRAITS,
+                    huntPortraits=hunts.PORTRAITS, legacyHuntStats=hunts.MONSTER_STATS,
                     contractTactic=hunts.tactic(state['contract']['name']) if state.get('contract') else None)
 
     def spend_boost(boost, units):
@@ -426,7 +426,7 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
     if kind in ('draw', 'craft', 'break'):
         result['questRewards'] = hunts.progress(state, kind, size if kind == 'draw' else quantity)
         state['influence'] += len(result['questRewards']) * seasons.TASK_INFLUENCE
-    if kind == 'strike' and result.get('questRewards'):
+    if kind in ('strike', 'auto-hunt') and result.get('questRewards'):
         state['contractsCompleted'] += 1
         state['influence'] += seasons.CONTRACT_INFLUENCE
     seasons.unlock(state, CARDS)

@@ -342,7 +342,19 @@ nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria
 
 /* Notice board and the two ranks of the hunt table. */
 .hunt-note{color:var(--muted,#c3b49c);font-size:.85rem;text-align:center;margin:.65rem 0}
-.hunt-link{display:inline-block;padding:.65rem .85rem;margin:.3rem 0;color:#f5dbac;border:1px solid #756043;border-radius:5px;background:#292219;text-decoration:none}
+.hunt-link{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:.65rem .85rem;margin:.3rem 0;color:#f5dbac;border:1px solid #756043;border-radius:5px;background:#292219;text-decoration:none}
+.hunt-forward .deck-arrow{transform:rotate(180deg)}
+.hunt-strength{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:6px 0;font-size:.86rem}
+.hunt-strength b{font-weight:750}
+.hunt-stars{display:inline-flex;gap:2px;color:#e4c38a}
+.quest-paper .hunt-stars{color:#775125}
+.hunt-star{width:18px;height:18px;overflow:visible}
+.hunt-star-metal{fill:currentColor;stroke:currentColor;stroke-width:.65;stroke-linejoin:round}
+.hunt-star-etch{fill:none;stroke:#33261b;stroke-width:.85;stroke-linejoin:round}
+.quest-paper .hunt-star-etch{stroke:#eed09b}
+.hunt-preview-stats{white-space:nowrap;font-variant-numeric:tabular-nums}
+.hunt-round{margin-top:8px;color:var(--gold);font-weight:700}
+
 .quest-posting{--oak:#39271d;padding:8px;border:1px solid #8c6846;border-radius:5px;background:repeating-linear-gradient(95deg,#40291d 0 3px,var(--oak) 4px 8px,#2a1c15 9px 11px);box-shadow:inset 0 0 0 3px #241711,inset 0 0 12px #130d09,0 7px 16px #0b0806aa}
 .quest-plaque{padding:7px 4px;text-align:center;background:linear-gradient(#412f22,#231a14);color:#d6b285;border-block:1px solid #8a6546;font:700 11px/1.2 var(--display-font);letter-spacing:.13em}
 .quest-plaque span{padding:0 5px;color:#a17a55}
@@ -424,7 +436,7 @@ nav a span{white-space:nowrap;letter-spacing:0}
 .season-profile-link .deck-arrow{width:28px;height:28px}
 .profile-link:focus-visible,.season-view a:focus-visible{outline:2px solid #ead1a3;outline-offset:3px}
 .season-view{--ledger-line:#57514a;--ledger-muted:#c1b7a9;--ledger-accent:#e7ce9b;--ledger-score:#e4caff}
-.season-launch{display:block;margin:12px 0}
+.season-launch{display:flex;justify-content:space-between;margin:12px 0}
 .season-hero,.season-panel{border:1px solid var(--ledger-line);border-radius:10px;background:linear-gradient(145deg,#292a2b,#171819);padding:15px;margin:0 0 12px}
 .season-hero{background:radial-gradient(ellipse at 50% -20%,#464038,transparent 74%),#1d1e20;text-align:center;box-shadow:inset 0 0 0 3px #18191a,0 4px 14px #0006}
 .season-kicker{color:var(--ledger-accent);font-size:.68rem;font-weight:800;letter-spacing:.14em;margin:4px 0 8px}

@@ -23,7 +23,7 @@ async function waitForFrame(image){
  finally{clearTimeout(timer);}
 }
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
-let shuffleMastery, craftRecipes, huntTarget, seasonEndsAt, drawOdds, huntPortraits, contractTactic;
+let shuffleMastery, craftRecipes, huntTarget, seasonEndsAt, drawOdds, huntPortraits, contractTactic, legacyHuntStats;
 let spinInfluence=1;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
@@ -50,7 +50,8 @@ function accept(out){
  offset=out.now-Math.floor(Date.now()/1000);
  shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
  drawOdds=out.drawOdds??drawOdds;huntPortraits=out.huntPortraits??huntPortraits;spinInfluence=out.spinInfluence??spinInfluence;
- contractTactic=out.contractTactic;
+ contractTactic=out.contractTactic;legacyHuntStats=out.legacyHuntStats;
+ warmAlbum();
  if(out.shuffleMastery)shuffleMastery=out.shuffleMastery;
  if(out.craftRecipes)craftRecipes=out.craftRecipes;
  if(out.maxCraftBatch)craftLimit=out.maxCraftBatch;
@@ -106,7 +107,18 @@ function paint(button,id,eager=false){
  button.setAttribute('aria-label',`${name} · ${rarities[r][0]}`);
  bindDetail(button,id);
 }
-function tile(id){const b=node('button',undefined,'tile');b.type='button';paint(b,id);return b;}
+function tile(id,eager){const b=node('button',undefined,'tile');b.type='button';paint(b,id,eager);return b;}
+const albumWarmLimit=9;
+const albumWarm=new Map();
+function warmAlbum(){
+ const ids=rarityGroups.flatMap(([r])=>catalog.filter(([id])=>id[4]===r&&qty(id)).map(([id])=>id)).slice(0,albumWarmLimit);
+ for(const id of albumWarm.keys())if(!ids.includes(id))albumWarm.delete(id);
+ for(const id of ids){
+  if(!art.has(id)||albumWarm.has(id))continue;
+  const img=new Image();img.decoding='async';img.fetchPriority='low';img.src=`/art/${id}.webp`;
+  albumWarm.set(id,img);void img.decode().catch(()=>{});
+ }
+}
 let albumKey;
 function album(){
  if(!state)return;
@@ -114,6 +126,7 @@ function album(){
  const key=collected.map(([id])=>art.has(id)?`${id}+`:id).join(',');
  // Keep the existing image nodes and their loaded artwork on return from detail.
  if(key===albumKey)return;
+ let tiles=0;
  const sections=rarityGroups.map(([r,name])=>{
   const all=catalog.filter(([id])=>id[4]===r);
   const owned=collected.filter(([id])=>id[4]===r);
@@ -123,7 +136,7 @@ function album(){
   section.append(header);
   if(owned.length){
    const grid=node('div',undefined,'grid');
-   grid.append(...owned.map(([id])=>tile(id)));
+   grid.append(...owned.map(([id])=>tile(id,tiles++<albumWarmLimit)));
    section.append(grid);
   }
   return section;
@@ -651,14 +664,14 @@ async function sync(){
  catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...testerButtons,$('break')])b.disabled=true;say(e.message);}}
  finally{syncing=false;}
 }
-const huntActions=new Set(['take-contract','save-deck','start-hunt','strike']);
+const huntActions=new Set(['take-contract','save-deck','start-hunt','strike','auto-hunt']);
 async function transact(kind,size,quantity=1,params){
  if(!state||busy)return;
  if(pending&&kind)return;
  if(!pending){pending={kind,op:crypto.randomUUID(),size,season:state.season,...(kind==='craft'?{quantity}:{}),...params};remember();}
  operationVersion++;
  busy=true;refresh();
- const op=pending;
+ const op=pending, fromNavigation=navigation;
  if(op.kind==='draw'){if(op.size===1)resetTable(table(''));DrawSound.play();}
  if(op.kind!=='edit-profile')DrawSound.prepareQuest();
  if(op.kind==='break'||op.kind==='craft'||huntActions.has(op.kind))DrawSound.unlock();
@@ -671,8 +684,8 @@ async function transact(kind,size,quantity=1,params){
   const prior=state.fight;
   accept(out);
   pending=null;remember();
-  if(op.kind!=='strike'&&op.kind!=='edit-profile')HuntUI.showRewards(out.questRewards);
-  if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior);
+  if(!['strike','auto-hunt','edit-profile'].includes(op.kind))HuntUI.showRewards(out.questRewards);
+  if(huntActions.has(op.kind))await HuntUI.apply(out,op,prior,fromNavigation);
   else if(op.kind==='edit-profile'){SeasonUI.saved(out.profileIdentity);say(I18n.text('Профиль сохранён.','Profile saved.'));}
   else if(op.kind==='draw'){SettingsUI.drawRecorded();await reveal(out);}
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
@@ -761,7 +774,7 @@ async function firstScreenArt(){
  for(const img of unready){
   if(img===back){for(const el of pane.querySelectorAll('.back,.stack,.shuffle-stack i'))el.classList.add('startup-back-fallback');}
   else if(img.classList.contains('deck-emblem'))img.style.visibility='hidden';
-  else img.remove();
+  else if(activePane!=='album')img.remove();
  }
 }
 (async()=>{
@@ -773,9 +786,16 @@ async function firstScreenArt(){
   if(signal.aborted)return;
   key=`grimdeck.pending.${session.player}`;
   try{pending=JSON.parse(sessionStorage.getItem(key));}catch{}
-  const [out,images]=await Promise.all([api('state',undefined,signal),optionalStartup(api('art',undefined,signal),[],2200)]);
+  const artRequest=api('art',undefined,signal);
+  const [out,images]=await Promise.all([api('state',undefined,signal),optionalStartup(artRequest,null,2200)]);
   if(signal.aborted)return;
-  art=new Set(images);accept(out);refresh();await route();
+  art=new Set(images??[]);accept(out);refresh();await route();
+  if(!images)void artRequest.then(late=>{
+   if(signal.aborted)return;
+   art=new Set(late);warmAlbum();refresh();
+   if(activePane==='album')album();
+   if(activeDetail)renderDetail(activeDetail.id);
+  }).catch(()=>{});
   say(pending?I18n.text('Предыдущий запрос не завершён. Можно повторить.','The previous request did not finish. You can retry it.'):local?I18n.text('Локальный стенд · стартовый баланс 120 монет','Local test mode · 120 starting crowns'):'');
   await firstScreenArt();
   if(signal.aborted)return;

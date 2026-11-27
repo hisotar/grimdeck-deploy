@@ -792,6 +792,74 @@ class FullGame(unittest.TestCase):
                          ([dict(id='d', coins=2)], 30))
         self.assertEqual(self.run_play('state', now=107200)[1]['state']['coins'], 18)
 
+    def test_auto_hunt_strengths_stable_and_parallel_starts_idempotent(self):
+        slots = sorted(game.CARDS, key=lambda cid: game.CARDS[cid][3], reverse=True)[:6]
+        self.seed(owned=dict.fromkeys(slots, 1), deck=slots)
+        board = self.run_play('state')[1]['state']['board']
+        self.assertEqual(self.run_play('state')[1]['state']['board'], board)
+        notices = [q for q in board['notices'] if q['kind'] == 'hunt']
+        notice = notices[0]
+        contract = notice['id']
+        self.assertEqual((notice['maxHp'], notice['atk']),
+                         game.hunts.strength_stats(notice['tier'], notice['stars']))
+        self.assertEqual(self.run_play('take-contract', 1, contract=contract)[1]['state']['contract'],
+                         dict(notice, taken=True))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            answers = list(pool.map(lambda n: self.run_play('auto-hunt', n, contract=contract), (2, 3)))
+        self.assertEqual(sorted(code for code, _ in answers), [200, 409])
+        n, (_, out) = next((n, answer) for n, answer in zip((2, 3), answers) if answer[0] == 200)
+        fight = out['state']['fight']
+        self.assertEqual(fight['status'], 'won')
+        self.assertEqual(fight['monster']['hp'], 0)
+        self.assertEqual(out['battle']['initial']['monster']['hp'], notice['maxHp'])
+        self.assertEqual(len(out['battle']['rounds']), fight['turn'])
+        self.assertEqual((out['state']['coins'], out['state']['contractsCompleted'], out['state']['influence']),
+                         (7 + notice['reward'], 1, game.seasons.CONTRACT_INFLUENCE))
+        self.assertIsNone(out['state']['contract'])
+        self.assertEqual(self.run_play('auto-hunt', n, contract=contract), (200, out))
+        self.assertEqual(self.run_play('auto-hunt', n, contract='wrong')[0], 409)
+        self.assertEqual(self.run_play('state')[1]['state'], out['state'])
+
+    def test_same_monster_can_appear_at_all_four_strengths(self):
+        variants = {}
+        for day in range(1, 200):
+            state = {}
+            game.hunts.board_for(state, 'A', day * game.hunts.DAY)
+            for q in state['board']['notices']:
+                if q.get('name') == 'Главоглаз':
+                    variants[q['stars']] = q['maxHp'], q['atk'], q['reward'], q['art']
+        self.assertEqual(set(variants), {0, 1, 2, 3})
+        self.assertEqual([variants[i][3] for i in range(4)], ['WIT_C12'] * 4)
+        for low, high in zip(range(3), range(1, 4)):
+            self.assertTrue(all(a < b for a, b in zip(variants[low][:3], variants[high][:3])))
+
+    def test_auto_hunt_resumes_legacy_snapshot_beyond_three_rounds(self):
+        contract = dict(id='a', name='Полуденница', tier=1, reward=3)
+        unit = dict(id='WIT_C01', atk=4, hp=7, maxHp=9)
+        monster = dict(contract, hp=8, maxHp=18, atk=1, tactic='rear')
+        fight = dict(id='a', status='active', turn=2, monster=monster, units=[unit, None, None, None, None, None])
+        self.seed(owned={}, deck=[None]*6, contract=contract, fight=fight)
+        status, out = self.run_play('auto-hunt', contract='a')
+        self.assertEqual(status, 200)
+        self.assertEqual(out['battle']['initial'], fight)
+        self.assertEqual(out['battle']['rounds'][0][-1], dict(slot=0, unitHp=6, damage=1))
+        finished = out['state']['fight']
+        self.assertEqual((finished['status'], finished['turn'], finished['units'][0]['hp']), ('won', 6, 4))
+        self.assertEqual(self.run_play('strike', 2, contract='a', turn=2)[0], 409)
+        self.assertEqual(self.run_play('state')[1]['state']['coins'], 10)
+
+    def test_automatic_loss_has_no_payout(self):
+        contract = dict(id='a', name='Брукса', tier=3, stars=3, maxHp=210, atk=26, reward=5)
+        self.seed(owned={'WIT_C01': 1}, deck=[None]*3 + ['WIT_C01', None, None], contract=contract)
+        status, out = self.run_play('auto-hunt', contract='a')
+        self.assertEqual(status, 200)
+        fight = out['state']['fight']
+        self.assertEqual((fight['status'], fight['units'][3]['hp'], fight['turn']), ('lost', 0, 1))
+        self.assertGreater(fight['monster']['hp'], 0)
+        self.assertNotIn('questRewards', out)
+        self.assertEqual((out['state']['coins'], out['state']['contractsCompleted'], out['state']['influence']), (7, 0, 0))
+        self.assertIsNone(out['state']['contract'])
+
     def test_hunt_validation_snapshot_parallel_strike_and_reward(self):
         strongest = max(game.CARDS, key=lambda cid:game.CARDS[cid][3])
         slots = sorted(game.CARDS, key=lambda cid: game.CARDS[cid][3], reverse=True)[:6]

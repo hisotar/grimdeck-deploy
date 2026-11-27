@@ -1,12 +1,13 @@
 """Daily notices and server-authoritative monster hunts."""
+from copy import deepcopy
 import hashlib
 import random
 
 DAY = 86400
 MOSCOW = 3 * 3600
-# Names, optional catalog portrait, and difficulty (1–3). Missing art is handled by the client.
+# Names, optional catalog portrait, and base tier (1–3). Missing art is handled by the client.
 MONSTERS = (
-    ('Альгуль', 'WIT_C03', 1), ('Главоглаз', None, 2),
+    ('Альгуль', 'WIT_C03', 1), ('Главоглаз', 'WIT_C12', 2),
     ('Земляной элементаль', 'WIT_C16', 2), ('Огненный элементаль', 'WIT_C17', 3),
     ('Ледяной элементаль', 'WIT_C18', 2), ('Ифрит', 'WIT_C19', 3), ('Голем', 'WIT_C20', 2),
     ('Волколак', 'WIT_C22', 1), ('Полуденница', 'WIT_C33', 1), ('Полуночница', 'WIT_C34', 2),
@@ -18,9 +19,17 @@ PORTRAITS = {name: art for name, art, _ in MONSTERS if art}
 LEGACY_NAMES = {'Водный элементаль': 'Ледяной элементаль', 'Волк альфа': 'Волколак'}
 # Fixed by tier: empty slots do not make a contract easier. Existing fights keep their snapshot.
 MONSTER_STATS = {1: (81, 13), 2: (91, 16), 3: (104, 16)}  # (health, attack)
+STRENGTH_STATS = ((67, 10), (104, 15), (148, 20), (202, 25))
+
+
+def strength_stats(tier, stars):
+    hp, atk = STRENGTH_STATS[stars]
+    return hp + (tier - 2) * 8, atk + tier - 2
+
+
 REAR_HUNTERS = {'Полуденница', 'Полуночница', 'Катакан', 'Брукса', 'Вилохвост', 'Грифон'}
 ACTIONS = {'take-contract': 'contract', 'save-deck': 'slots', 'start-hunt': 'contract',
-           'strike': 'turn'}
+           'strike': 'turn', 'auto-hunt': 'contract'}
 
 
 def tactic(name):
@@ -67,8 +76,10 @@ def board_for(state, uid, now, *, renew=False):
     pool = [i for i, (name, _, _) in enumerate(MONSTERS) if name not in old_hunts]
     for i in rng.sample(pool, 2):
         name, art, tier = MONSTERS[i]
+        stars = rng.randrange(4)
+        hp, atk = strength_stats(tier, stars)
         notices.append(dict(id=f'{notice_id}:hunt:{i}', kind='hunt', name=name, art=art,
-                            tier=tier, reward=2 + tier, taken=False))
+                            tier=tier, stars=stars, maxHp=hp, atk=atk, reward=2 + stars, taken=False))
     rng.shuffle(notices)
     state['board'] = dict(day=day, generation=generation, resetsAt=(day + 1) * DAY - MOSCOW, notices=notices)
 
@@ -124,21 +135,51 @@ def action(state, cards, kind, params):
             chosen.add(cid)
         state['deck'] = slots
         return 200, {}
-    if kind == 'start-hunt':
-        if not contract or contract['id'] != contract_id or (fight and fight['status'] == 'active'):
+    if kind in ('start-hunt', 'auto-hunt'):
+        if not contract or contract['id'] != contract_id:
             return 409, {'error': 'Заказ недоступен или охота уже началась'}
-        units = [dict(id=cid, atk=cards[cid][3], hp=cards[cid][4], maxHp=cards[cid][4])
-                 if cid in cards and owned.get(cid) else None for cid in state.get('deck', [None] * 6)]
-        if not any(units):
-            return 409, {'error': 'Поставь на стол хотя бы одну карту'}
-        hp, atk = MONSTER_STATS[contract['tier']]
-        monster = {**contract, 'hp': hp, 'maxHp': hp, 'atk': atk}
-        monster['tactic'] = tactic(contract['name'])
-        state['fight'] = dict(id=contract_id, turn=0, status='active', units=units, monster=monster)
-        return 200, {'started': contract_id}
-    if (not contract or not fight or fight['status'] != 'active' or fight['id'] != contract_id
-            or type(params.get('turn')) is not int or params['turn'] != fight['turn']):
-        return 409, {'error': 'Ход уже завершён или охота недоступна'}
+        if fight and fight['status'] == 'active':
+            if kind != 'auto-hunt' or fight['id'] != contract_id:
+                return 409, {'error': 'Заказ недоступен или охота уже началась'}
+        else:
+            units = [dict(id=cid, atk=cards[cid][3], hp=cards[cid][4], maxHp=cards[cid][4])
+                     if cid in cards and owned.get(cid) else None for cid in state.get('deck', [None] * 6)]
+            if not any(units):
+                return 409, {'error': 'Поставь на стол хотя бы одну карту'}
+            hp, atk = contract_stats(contract)
+            monster = {**contract, 'hp': hp, 'maxHp': hp, 'atk': atk, 'tactic': tactic(contract['name'])}
+            fight = state['fight'] = dict(id=contract_id, turn=0, status='active', units=units, monster=monster)
+        if kind == 'start-hunt':
+            return 200, {'started': contract_id}
+        initial = deepcopy(fight)
+        rounds = []
+        # Every living round reduces one side's HP; the server owns the entire result.
+        while fight['status'] == 'active':
+            rounds.append(round_of(fight))
+        result = {'battle': dict(initial=initial, rounds=rounds)}
+    else:
+        if (not contract or not fight or fight['status'] != 'active' or fight['id'] != contract_id
+                or type(params.get('turn')) is not int or params['turn'] != fight['turn']):
+            return 409, {'error': 'Ход уже завершён или охота недоступна'}
+        events = round_of(fight)
+        result = dict(strike=dict(id=contract_id, turn=fight['turn'], events=events))
+        # Older cached clients retain their original three-strike flow.
+        if fight['status'] == 'active' and fight['turn'] == 3:
+            fight['status'] = 'lost'
+    if fight['status'] == 'won':
+        result['questRewards'] = [award(state, contract)]
+    if fight['status'] != 'active':
+        state['contract'] = None
+    return 200, result
+
+
+def contract_stats(contract):
+    if 'maxHp' in contract and 'atk' in contract:
+        return contract['maxHp'], contract['atk']
+    return MONSTER_STATS[contract['tier']]
+
+
+def round_of(fight):
     units, monster = fight['units'], fight['monster']
     events = []
     for i, unit in enumerate(units):
@@ -156,12 +197,8 @@ def action(state, cards, kind, params):
             unit['hp'] = max(0, unit['hp'] - monster['atk'])
             events.append(dict(slot=target, unitHp=unit['hp'], damage=monster['atk']))
     fight['turn'] += 1
-    result = dict(strike=dict(id=contract_id, turn=fight['turn'], events=events))
     if not monster['hp']:
         fight['status'] = 'won'
-        result['questRewards'] = [award(state, contract)]
-    elif fight['turn'] == 3 or not any(unit and unit['hp'] for unit in units):
+    elif not any(unit and unit['hp'] for unit in units):
         fight['status'] = 'lost'
-    if fight['status'] != 'active':
-        state['contract'] = None
-    return 200, result
+    return events

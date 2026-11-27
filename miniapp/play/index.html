@@ -91,6 +91,7 @@ const grimBoot=(()=>{
   <circle cx="16" cy="16" r="14" fill="#261e30" stroke="#a18ab7"/>
   <path d="M16 7v16m-6 0h12M8 12h16M8 12l-4 7h8l-4-7Zm16 0-4 7h8l-4-7Z" fill="none" stroke="#e7d2ff" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
  </symbol>
+ <symbol id="hunt-star" viewBox="0 0 24 24"><path class="hunt-star-metal" d="m12 1 2.8 6.8L22 6l-4.8 6 4.8 6-7.2-1.8L12 23l-2.8-6.8L2 18l4.8-6L2 6l7.2 1.8Z"/><path class="hunt-star-etch" d="m12 5 1.6 5.4L18 8.4 15 12l3 3.6-4.4-2L12 19l-1.6-5.4-4.4 2L9 12 6 8.4l4.4 2Z"/></symbol>
  <symbol id="nav-arrow" viewBox="0 0 24 24"><path d="M20 12H4m0 0 6-6m-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </defs></svg>
 <div class="game-brand"><b>✦ GRIMDECK</b><div class="header-actions"><button id="openSettings" type="button" aria-controls="settings" data-i18n-text="Settings">Настройки</button><button id="sound" type="button" data-i18n-text="Sound">Звук</button></div></div>
@@ -207,7 +208,7 @@ const grimBoot=(()=>{
  <section id="tool-quests" class="deck-tool" aria-label="Задания" hidden data-i18n-aria-label="Quests">
   <a class="deck-back" href="#home"><svg class="deck-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 12H4m0 0 6-6m-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n-text="Deck">Колода</span></a><h1 data-i18n-text="Notice board">Доска объявлений</h1>
   <p class="hunt-note" data-i18n-text="New notices daily at 00:00 MSK">Новые объявления каждый день в 00:00 МСК</p>
-  <a id="questHunt" class="hunt-link" href="#battle" hidden data-i18n-text="To the hunt →">К охоте →</a>
+  <a id="questHunt" class="hunt-link hunt-forward" href="#battle" hidden><span data-i18n-text="To the hunt">К охоте</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
   <div class="quest-posting"><div class="quest-plaque" aria-hidden="true" data-i18n-text="NOTICES AND CONTRACTS"><span>✦</span> ОБЪЯВЛЕНИЯ И ЗАКАЗЫ <span>✦</span></div><div id="questBoard" class="quest-board"></div></div>
  </section>
  <section id="battle" class="deck-tool" aria-labelledby="battleTitle" hidden>
@@ -215,16 +216,16 @@ const grimBoot=(()=>{
   <div id="battleDeck" class="battle-table"></div>
   <div class="hunt-actions"><button id="autoDeck" type="button" disabled data-i18n-text="Auto-build">Автосбор</button><button id="resetDeck" type="button" disabled data-i18n-text="Reset">Сброс</button></div>
   <button class="hunt-wide" type="button" disabled data-i18n-text="PvP battle">Бой в PvP</button><p class="hunt-note" data-i18n-text="The arena will open in a future update.">Арена откроется в одном из следующих обновлений.</p>
-  <a class="hunt-link season-launch" href="#glory" data-i18n-text="✦ Glory · arena rankings →">✦ Слава · рейтинг арены →</a>
+  <a class="hunt-link hunt-forward season-launch" href="#glory"><span data-i18n-text="✦ Glory · arena rankings">✦ Слава · рейтинг арены</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
   <div id="battleContract" class="battle-contract"></div>
  </section>
  <section id="hunt" class="deck-tool" aria-label="Охота" hidden data-i18n-aria-label="Hunt">
-  <a class="deck-back" href="#battle" data-i18n-text="← Battle">← Бой</a>
+  <a class="deck-back" href="#battle"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Battle">Бой</span></a>
   <div id="huntEnemy"></div>
   <div id="huntOutcome" role="status" aria-atomic="true"></div>
-  <a id="huntReturn" class="hunt-link" href="#battle" hidden data-i18n-text="Return to battle →">Вернуться к бою →</a>
+  <a id="huntReturn" class="hunt-link" href="#battle" hidden><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Return to battle">Вернуться к бою</span></a>
   <p id="huntIntent" class="hunt-intent" hidden></p><div id="huntDeck" class="battle-table"></div>
-  <button id="strike" class="primary hunt-wide" type="button" disabled data-i18n-text="Strike">Ударить</button>
+  <button id="resumeHunt" class="primary hunt-wide" type="button" hidden disabled data-i18n-text="Resume battle">Продолжить бой</button>
  </section>
  <section id="tool-rank" class="deck-tool season-view" aria-labelledby="topTitle" hidden>
  <a class="deck-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Deck">Колода</span></a>
@@ -238,7 +239,7 @@ const grimBoot=(()=>{
  <p id="topStatus" role="status"></p><ol id="topRows" class="season-rows"></ol>
 </section>
 <section id="glory" class="deck-tool season-view" aria-labelledby="gloryTitle" hidden>
- <a class="deck-back" href="#battle" data-i18n-text="← Battle">← Бой</a>
+ <a class="deck-back" href="#battle"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Battle">Бой</span></a>
  <div class="season-hero"><p class="season-kicker" data-i18n-text="ARENA · SEASON LEADERBOARD">АРЕНА · СЕЗОННЫЙ РЕЙТИНГ</p><h1 id="gloryTitle" data-i18n-text="Glory">Слава</h1><p data-i18n-text="The arena is closed for now. Rankings will appear after the first PvP battles.">Арена пока закрыта. Здесь появятся места после первых PvP-боёв.</p></div>
  <div class="season-panel"><h2 data-i18n-text="Season rewards">Награды сезона</h2><p data-i18n-text="Only players in prize-winning arena placements receive spins: 1st, 2nd–3rd, 4th–5th and 6th–10th. Influence does not affect rewards.">Крутки получат только игроки на призовых местах арены: 1-е, 2–3-е, 4–5-е и 6–10-е. Влияние на награды не влияет.</p></div>
 </section>
@@ -324,7 +325,7 @@ const grimBoot=(()=>{
   <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><rect x="6" y="3" width="13" height="18" rx="2"/><path d="M3 6v13m7-7 2.5-3.5L15 12l-2.5 3.5z"/></svg></span><div><h2 data-i18n-text="Spins & rarity">Крутки и редкость</h2><p data-i18n-text="Open 1, 10 or 50 cards. Free and earned spins are spent before crowns. Mythic cards are the rarest.">Открывай по 1, 10 или 50 карт. Сначала расходуются бесплатные и заработанные крутки, потом кроны. Мифические карты — самые редкие.</p></div></li>
   <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 6C8 3 5 4 3 5v14c3-1 6-1 9 1 3-2 6-2 9-1V5c-2-1-5-2-9 1zm0 0v14M6 9h3m6 0h3M6 13h3m6 0h3"/></svg></span><div><h2 data-i18n-text="Collection">Коллекция</h2><p data-i18n-text="Tap a card to see its stats. New cards fill the album; duplicates can be used in crafting.">Открой карту, чтобы увидеть её характеристики. Новые карты пополняют альбом, а повторки пригодятся для крафта.</p></div></li>
   <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="m9 9 11 11-2 2L7 11m-4 1L2 9l7-7 4 2 2 4-4 4-3-3z"/></svg></span><div><h2 data-i18n-text="Shuffle & crafting">Перетасовка и крафт</h2><p data-i18n-text="Shuffling yields dust or a random reward. Crafting trades dust and duplicates for spins and boosters.">Перетасовка приносит пыль или случайную награду. В крафте меняй пыль и повторки на крутки и усилители.</p></div></li>
-  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 3h14v18l-3-1-4 1-4-1-3 1V3zm3 5h8m-8 4h8m-8 4h5"/></svg></span><div><h2 data-i18n-text="Tasks & contracts">Задания и заказы</h2><p data-i18n-text="Complete tasks on the board. Take a contract, build a battle deck, and defeat the monster for a reward.">Выполняй задания на доске. Возьми заказ, собери боевую колоду и победи чудовище, чтобы получить награду.</p></div></li>
+  <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 3h14v18l-3-1-4 1-4-1-3 1V3zm3 5h8m-8 4h8m-8 4h5"/></svg></span><div><h2 data-i18n-text="Tasks & contracts">Задания и заказы</h2><p data-i18n-text="Complete tasks on the board. Check the monster’s strength, build your deck and start the battle, which runs automatically to the end.">Выполняй задания на доске. Проверь силу чудовища, собери колоду и начни бой — он пройдёт автоматически до победы одной стороны.</p></div></li>
   <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="m4 4 4 1 12 13m-5 2 5-5m-2 3 3 3M20 4l-4 1-5 5m-3 3-4 5m0-3 5 5m-3-2-3 3"/></svg></span><div><h2 data-i18n-text="Battle deck">Боевая колода</h2><p data-i18n-text="Use all six slots if you can. Front cards deal half damage (rounded up), rear cards deal full damage. Put a tough card first in the row the monster targets. The PvP arena is not open yet.">По возможности заполни все шесть слотов. Фронт наносит половину урона с округлением вверх, тыл — полный урон. Поставь живучую карту первой в ряду, по которому бьёт чудовище. Арена PvP пока закрыта.</p></div></li>
   <li><span aria-hidden="true" class="setting-sigil"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v16m-4 2h8M5 7h14M5 7l-3 6h6L5 7zm14 0-3 6h6l-3-6z"/></svg></span><div><h2 data-i18n-text="Influence & seasons">Влияние и сезоны</h2><p data-i18n-text="Spins, tasks, and contracts move you up the seasonal leaderboard. At midnight Moscow time on the first day of the month, your collection and influence reset. Spins, dust, crowns and boosters carry over.">Крутки, задания и заказы поднимают тебя в сезонном топе. Первого числа в 00:00 МСК коллекция и влияние сбрасываются; крутки, пыль, кроны и усилители остаются.</p></div></li>
  </ol>
