@@ -254,6 +254,8 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         needs_save = True
     inventory = state.setdefault('boostInventory', {})
     active = state.setdefault('activeBoosts', {})
+    if hunts.rename_saved_monsters(state):
+        needs_save = True
     hunts.board_for(state, uid, now)
 
     def reply():

@@ -8,13 +8,14 @@ MOSCOW = 3 * 3600
 MONSTERS = (
     ('Альгуль', 'WIT_C03', 1), ('Главоглаз', None, 2),
     ('Земляной элементаль', 'WIT_C16', 2), ('Огненный элементаль', 'WIT_C17', 3),
-    ('Водный элементаль', 'WIT_C18', 2), ('Ифрит', 'WIT_C19', 3), ('Голем', 'WIT_C20', 2),
-    ('Волк альфа', 'WIT_C22', 1), ('Полуденница', 'WIT_C33', 1), ('Полуночница', 'WIT_C34', 2),
+    ('Ледяной элементаль', 'WIT_C18', 2), ('Ифрит', 'WIT_C19', 3), ('Голем', 'WIT_C20', 2),
+    ('Волколак', 'WIT_C22', 1), ('Полуденница', 'WIT_C33', 1), ('Полуночница', 'WIT_C34', 2),
     ('Тролль', 'WIT_C32', 1), ('Хим', 'WIT_R14', 3), ('Катакан', 'WIT_R08', 2),
     ('Брукса', 'WIT_R07', 3), ('Леший', 'WIT_R03', 3), ('Вилохвост', 'WIT_R05', 2),
     ('Грифон', 'WIT_R01', 2),
 )
 PORTRAITS = {name: art for name, art, _ in MONSTERS if art}
+LEGACY_NAMES = {'Водный элементаль': 'Ледяной элементаль', 'Волк альфа': 'Волколак'}
 # Fixed by tier: empty slots do not make a contract easier. Existing fights keep their snapshot.
 MONSTER_STATS = {1: (81, 13), 2: (91, 16), 3: (104, 16)}  # (health, attack)
 REAR_HUNTERS = {'Полуденница', 'Полуночница', 'Катакан', 'Брукса', 'Вилохвост', 'Грифон'}
@@ -24,6 +25,18 @@ ACTIONS = {'take-contract': 'contract', 'save-deck': 'slots', 'start-hunt': 'con
 
 def tactic(name):
     return 'rear' if name in REAR_HUNTERS else 'front'
+
+
+def rename_saved_monsters(state):
+    """Update display names in existing notices, contracts and combat snapshots."""
+    changed = False
+    notices = state.get('board', {}).get('notices', ())
+    fight = state.get('fight') or {}
+    for monster in (*notices, state.get('contract'), fight.get('monster')):
+        if monster and monster.get('name') in LEGACY_NAMES:
+            monster['name'] = LEGACY_NAMES[monster['name']]
+            changed = True
+    return changed
 
 
 def board_for(state, uid, now, *, renew=False):

@@ -826,6 +826,29 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('take-contract', 13, contract=contract)[0], 409)
         self.assertEqual(self.run_play('take-contract', 14, contract=b['id'])[0], 200)
 
+    def test_renamed_monsters_in_saved_contract_and_fight(self):
+        wolf = dict(id='wolf', kind='hunt', name='Волк альфа', art=None, tier=1, reward=3, taken=True)
+        ice = dict(id='ice', kind='hunt', name='Водный элементаль', art='WIT_C18', tier=2, reward=4, taken=False)
+        fight = dict(id=wolf['id'], status='active', turn=1, units=[None]*6,
+                     monster=dict(wolf, hp=7, maxHp=12, atk=2, tactic='front'))
+        self.seed(board=dict(day=1, notices=[wolf, ice]), contract=wolf, fight=fight)
+        renamed_wolf, renamed_ice = dict(wolf, name='Волколак'), dict(ice, name='Ледяной элементаль')
+        expected_fight = dict(fight, monster=dict(fight['monster'], name='Волколак'))
+        status, out = self.run_play('state')
+        self.assertEqual(status, 200)
+        self.assertEqual(out['state']['board']['notices'], [renamed_wolf, renamed_ice])
+        self.assertEqual(out['state']['contract'], renamed_wolf)
+        self.assertEqual(out['state']['fight'], expected_fight)
+        self.assertEqual(out['huntPortraits']['Волколак'], 'WIT_C22')
+        self.assertEqual(out['huntPortraits']['Ледяной элементаль'], 'WIT_C18')
+        self.assertEqual(out['contractTactic'], 'front')
+        with closing(sqlite3.connect(self.path)) as db:
+            saved = json.loads(db.execute('SELECT state FROM players WHERE uid=?', ('A',)).fetchone()[0])
+        self.assertEqual(saved['fight'], expected_fight)
+        for name, art in (('Волколак', 'WIT_C22'), ('Ледяной элементаль', 'WIT_C18')):
+            self.assertEqual(game.CARDS[art][1], name)
+            self.assertTrue(any(m[:2] == (name, art) for m in game.hunts.MONSTERS))
+
     def test_rebalanced_contracts_reward_deck_building_and_placement(self):
         mixed = ['WIT_R18', 'WIT_C22', 'WIT_C28', 'WIT_L01', 'WIT_R03', 'WIT_R06']
         cases = (
