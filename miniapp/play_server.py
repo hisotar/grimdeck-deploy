@@ -469,6 +469,9 @@ class Play(Handler):
         if path=='/art/witcher-icon.png':
             file=WEB/'art'/'witcher icon.png'
             if file.is_file(): return self.send(200,file.read_bytes(),'image/png')
+        if re.fullmatch(r'/art/album/WIT_[CRELM][0-9]{2}\.webp',path):
+            file=WEB/'art'/'album'/path.rsplit('/',1)[1]
+            if file.is_file(): return self.send(200,file.read_bytes(),'image/webp',cache='public, max-age=3600, must-revalidate')
         if re.fullmatch(r'/art/(?:WIT_[CRELM][0-9]{2}|card-frame|GrimDeck_card_back)\.webp',path):
             file=WEB/'art'/path.rsplit('/',1)[1]
             if file.is_file(): return self.send(200,file.read_bytes(),'image/webp')

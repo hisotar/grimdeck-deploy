@@ -80,7 +80,6 @@ const HuntUI=(()=>{
    if(complete)paper.classList.add('quest-complete');
    paper.append(node('small',isHunt?t('ЗАКАЗ НА ЧУДОВИЩЕ','MONSTER CONTRACT'):t('ЕЖЕДНЕВНОЕ ЗАДАНИЕ','DAILY QUEST')),node('h2',isHunt?monsterName(q.name):titles[q.kind]),node('b',`◉ ${q.reward} ${I18n.crowns(q.reward)}`,'quest-pay'));
    if(isHunt){
-    paper.append(strength(q,true));
     paper.append(button(state.contract?t('Уже взят заказ','Contract already taken'):t('Сорвать заказ','Take contract'),()=>transact('take-contract',0,1,{contract:q.id}),blocked||!!state.contract));
    }else{
     const count=node('p',t(`Прогресс: ${q.progress} / ${q.goal}`,`Progress: ${q.progress} / ${q.goal}`));
@@ -225,6 +224,35 @@ const HuntUI=(()=>{
   fx.setAttribute('aria-hidden','true');fx.append(node('b',`−${damage}`));target.append(fx);
   setTimeout(()=>fx.remove(),440);
  }
+ async function animateHit(event, viewing){
+  if(!viewing())return;
+  const el=$('huntDeck').querySelector(`[data-slot="${event.slot}"]`), monster=$('huntEnemy').firstElementChild;
+  if(!el||!monster)return;
+  const counter=event.unitHp!==undefined;
+  const mover=counter?monster:el, target=counter?(el.querySelector('.card-portrait')||el):monster;
+  let contact='none', approach;
+  if(!motion.matches){
+   const a=mover.getBoundingClientRect(), b=target.getBoundingClientRect();
+   const x=b.left+b.width/2-a.left-a.width/2, y=b.top+b.height/2-a.top-a.height/2;
+   contact=`translate(${x}px,${y}px) scale(${counter ? .36 : .82})`;
+   approach=mover.animate?.([
+    {transform:'none',zIndex:6},
+    {transform:`translate(${-x*.04}px,${counter?-9:8}px) rotate(${counter?4:-5}deg)`,zIndex:6,offset:.32},
+    {transform:contact,zIndex:6}
+   ],{duration:counter?235:200,fill:'forwards',easing:'cubic-bezier(.56,.04,.73,.68)'});
+   await approach?.finished.catch(()=>{});
+  }
+  approach?.cancel();
+  if(!viewing())return;
+  if(counter){el.querySelector('.unit-hp').textContent=event.unitHp;el.classList.toggle('defeated',!event.unitHp);}
+  else monster.querySelector('.enemy-hp').textContent=event.monsterHp;
+  DrawSound.cue(counter?'hunt-counter':'hunt-hit');
+  if(!motion.matches){
+   impact(target,counter,event.damage);
+   target.animate?.([{transform:'none'},{transform:`translate(${counter?4:-4}px,${counter?5:-3}px) rotate(${counter?4:-2}deg)`,offset:.22},{transform:'none'}],{duration:210});
+   await mover.animate?.([{transform:contact,zIndex:6},{transform:'none',zIndex:6}],{duration:counter?240:160,easing:'ease-out'}).finished.catch(()=>{});
+  }
+ }
  async function playBattle(out, fromNavigation){
   const fight=state.fight, {initial,rounds}=out.battle;
   // A retried receipt may describe an older battle than the current state.
@@ -238,22 +266,14 @@ const HuntUI=(()=>{
    if(targetPane()==='battle')await go('hunt');
    const viewing=()=>navigation===version&&targetPane()==='hunt'&&!motion.matches;
    if(!replay||!viewing())return;
-   const monster=$('huntEnemy').firstElementChild, status=$('huntOutcome');
+   const status=$('huntOutcome');
    status.className='hunt-round';
    for(const [i,events] of rounds.entries()){
     if(!viewing())break;
     status.textContent=t(`Раунд ${initial.turn+i+1}`,`Round ${initial.turn+i+1}`);
-    const steps=Math.max(1,events.length), beat=Math.min(150,3000/rounds.length/steps);
     for(const event of events){
      if(!viewing())break;
-     const slot=$('huntDeck').querySelector(`[data-slot="${event.slot}"]`);
-     const counter=event.unitHp!==undefined;
-     if(counter){slot.querySelector('.unit-hp').textContent=event.unitHp;slot.classList.toggle('defeated',!event.unitHp);}
-     else monster.querySelector('.enemy-hp').textContent=event.monsterHp;
-     const mover=counter?monster:slot, target=counter?slot:monster;
-     mover.animate?.([{transform:'none'},{transform:`translateY(${counter?9:-9}px)`,offset:.45},{transform:'none'}],{duration:beat});
-     if(beat>=65){impact(target,counter,event.damage);DrawSound.cue(counter?'hunt-counter':'hunt-hit');}
-     await pause(beat);
+     await animateHit(event,viewing);
     }
    }
   }finally{
@@ -286,34 +306,10 @@ const HuntUI=(()=>{
    const version=navigation;
    animating=true;
    try{
+    const viewing=()=>navigation===version&&targetPane()==='hunt';
     for(const event of strike.events){
-     if(navigation!==version||targetPane()!=='hunt')break;
-     const el=$('huntDeck').querySelector(`[data-slot="${event.slot}"]`), monster=$('huntEnemy').firstElementChild;
-     if(!el||!monster)break;
-     const counter=event.unitHp!==undefined;
-     const mover=counter?monster:el, target=counter?(el.querySelector('.card-portrait')||el):monster;
-     let contact='none', approach;
-     if(!motion.matches){
-      const a=mover.getBoundingClientRect(), b=target.getBoundingClientRect();
-      const x=b.left+b.width/2-a.left-a.width/2, y=b.top+b.height/2-a.top-a.height/2;
-      contact=`translate(${x}px,${y}px) scale(${counter ? .36 : .82})`;
-      approach=mover.animate?.([
-       {transform:'none',zIndex:6},
-       {transform:`translate(${-x*.04}px,${counter?-9:8}px) rotate(${counter?4:-5}deg)`,zIndex:6,offset:.32},
-       {transform:contact,zIndex:6}
-      ],{duration:counter?235:200,fill:'forwards',easing:'cubic-bezier(.56,.04,.73,.68)'});
-      await approach?.finished.catch(()=>{});
-     }
-     approach?.cancel();
-     if(navigation!==version||targetPane()!=='hunt')break;
-     if(counter){el.querySelector('.unit-hp').textContent=event.unitHp;el.classList.toggle('defeated',!event.unitHp);}
-     else monster.querySelector('.enemy-hp').textContent=event.monsterHp;
-     DrawSound.cue(counter?'hunt-counter':'hunt-hit');
-     if(!motion.matches){
-      impact(target,counter,event.damage);
-      target.animate?.([{transform:'none'},{transform:`translate(${counter?4:-4}px,${counter?5:-3}px) rotate(${counter?4:-2}deg)`,offset:.22},{transform:'none'}],{duration:210});
-      await mover.animate?.([{transform:contact,zIndex:6},{transform:'none',zIndex:6}],{duration:counter?240:160,easing:'ease-out'}).finished.catch(()=>{});
-     }
+     if(!viewing())break;
+     await animateHit(event,viewing);
     }
    }finally{animating=false;renderKey='';refresh();}
    showRewards(out.questRewards);

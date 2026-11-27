@@ -58,11 +58,11 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass  # Do not log URLs, headers, or Telegram credentials.
 
-    def send(self, status, body, kind='application/json', cookie=None):
+    def send(self, status, body, kind='application/json', cookie=None, *, cache='no-store'):
         self.send_response(status)
         self.send_header('Content-Type', kind)
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', cache)
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         if cookie:

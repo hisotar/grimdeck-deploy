@@ -58,17 +58,23 @@ function accept(out){
  if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
 }
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
-function media(id,locked=false,eager=false){
+const albumArtUrl=id=>`/art/album/${id}.webp`;
+function media(id,locked=false,eager=false,preview=false){
  const el=node('span',locked?'◇':rarities[id[4]][1],'media');el.setAttribute('aria-hidden','true');
- if(!locked&&art.has(id)){const img=new Image();img.alt='';img.loading=eager?'eager':'lazy';img.decoding='async';img.onerror=()=>img.remove();img.src=`/art/${id}.webp`;el.append(img);}
+ if(!locked&&art.has(id)){
+  const original=`/art/${id}.webp`, img=new Image();img.alt='';img.loading=eager?'eager':'lazy';img.decoding='async';
+  img.onerror=()=>img.remove();
+  if(preview)img.onerror=()=>{img.onerror=()=>img.remove();img.src=original;};
+  img.src=preview?albumArtUrl(id):original;el.append(img);
+ }
  return el;
 }
-function cardPortrait(id,eager=false){
+function cardPortrait(id,eager=false,preview=false){
  const portrait=node('span',undefined,'card-portrait');
  portrait.dataset.r=id[4];
  const frame=node('img',undefined,'card-frame');
  frame.alt='';frame.loading=eager?'eager':'lazy';frame.onerror=()=>frame.remove();frame.src=frameUrl;
- portrait.append(media(id,false,eager),frame);
+ portrait.append(media(id,false,eager,preview),frame);
  return portrait;
 }
 function renderDetail(id){
@@ -99,23 +105,24 @@ function roman(n){
  }
  return text;
 }
-function paint(button,id,eager=false){
- const [,name]=cards.get(id), r=id[4], portrait=cardPortrait(id,eager);
+function paint(button,id,eager=false,preview=false){
+ const [,name]=cards.get(id), r=id[4], portrait=cardPortrait(id,eager,preview);
  button.dataset.r=r;
  portrait.append(node('span',name,'tarot-title'));
  button.replaceChildren(portrait);
  button.setAttribute('aria-label',`${name} · ${rarities[r][0]}`);
  bindDetail(button,id);
 }
-function tile(id,eager){const b=node('button',undefined,'tile');b.type='button';paint(b,id,eager);return b;}
+function tile(id,eager,preview){const b=node('button',undefined,'tile');b.type='button';paint(b,id,eager,preview);return b;}
 const albumWarmLimit=9;
 const albumWarm=new Map();
 function warmAlbum(){
+ if(targetPane()==='album')return;
  const ids=rarityGroups.flatMap(([r])=>catalog.filter(([id])=>id[4]===r&&qty(id)).map(([id])=>id)).slice(0,albumWarmLimit);
  for(const id of albumWarm.keys())if(!ids.includes(id))albumWarm.delete(id);
  for(const id of ids){
   if(!art.has(id)||albumWarm.has(id))continue;
-  const img=new Image();img.decoding='async';img.fetchPriority='low';img.src=`/art/${id}.webp`;
+  const img=new Image();img.decoding='async';img.fetchPriority='low';img.src=albumArtUrl(id);
   albumWarm.set(id,img);void img.decode().catch(()=>{});
  }
 }
@@ -136,7 +143,7 @@ function album(){
   section.append(header);
   if(owned.length){
    const grid=node('div',undefined,'grid');
-   grid.append(...owned.map(([id])=>tile(id,tiles++<albumWarmLimit)));
+   grid.append(...owned.map(([id])=>tile(id,tiles++<albumWarmLimit,true)));
    section.append(grid);
   }
   return section;

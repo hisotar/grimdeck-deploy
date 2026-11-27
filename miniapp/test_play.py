@@ -584,6 +584,25 @@ class FullGame(unittest.TestCase):
 
         return server, request, signed
 
+    def test_album_preview_is_public_but_player_state_is_not_cacheable(self):
+        server, _, _ = self.api_client()
+
+        def get(path):
+            with closing(HTTPConnection(*server.server_address, timeout=3)) as conn:
+                conn.request('GET', path)
+                res = conn.getresponse()
+                return res.status, res.getheader('Content-Type'), res.getheader('Cache-Control'), res.read()
+
+        status, mime, cache, preview = get('/art/album/WIT_C01.webp')
+        self.assertEqual((status, mime, cache), (200, 'image/webp', 'public, max-age=3600, must-revalidate'))
+        self.assertEqual((preview[:4], preview[8:12]), (b'RIFF', b'WEBP'))
+        status, _, cache, original = get('/art/WIT_C01.webp')
+        self.assertEqual((status, cache), (200, 'no-store'))
+        self.assertLess(len(preview), len(original) // 5)
+        self.assertEqual(get('/art/album/GrimDeck_card_back.webp')[0], 404)
+        status, _, cache, _ = get('/api/state')
+        self.assertEqual((status, cache), (401, 'no-store'))
+
     def test_owner_spin_history_uses_successful_journal_with_stable_pagination(self):
         server, request, signed = self.api_client()
         owner = request('session', dict(initData=signed(1)))[2]
