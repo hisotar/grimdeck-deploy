@@ -1,0 +1,22 @@
+[
+  {"id": "necrophages", "ru": "Трупоеды", "en": "Necrophages", "cards": ["WIT_C01", "WIT_C02", "WIT_C03", "WIT_C04", "WIT_C05", "WIT_C06", "WIT_C07", "WIT_C24", "WIT_R04"]},
+  {"id": "relicts", "ru": "Реликты", "en": "Relicts", "cards": ["WIT_C28", "WIT_C29", "WIT_C32", "WIT_R03", "WIT_R18", "WIT_R20"]},
+  {"id": "insectoids", "ru": "Гнёзда инсектоидов", "en": "Insectoid Nests", "cards": ["WIT_C08", "WIT_C09", "WIT_C36", "WIT_C10", "WIT_C11", "WIT_C12", "WIT_C13"]},
+  {"id": "winged", "ru": "Крылатые хищники", "en": "Winged Predators", "cards": ["WIT_C14", "WIT_C15", "WIT_C31", "WIT_R01", "WIT_R05", "WIT_R06", "WIT_R16", "WIT_R17", "WIT_E18"]},
+  {"id": "constructs", "ru": "Стихии и големы", "en": "Elementals & Golems", "cards": ["WIT_C16", "WIT_C17", "WIT_C18", "WIT_C20", "WIT_R19"]},
+  {"id": "beasts", "ru": "Лесные звери", "en": "Woodland Beasts", "cards": ["WIT_C21", "WIT_C23", "WIT_C25", "WIT_C26", "WIT_C27", "WIT_C30"]},
+  {"id": "specters", "ru": "Призраки и тени", "en": "Specters & Shadows", "cards": ["WIT_C33", "WIT_C34", "WIT_C35", "WIT_R13", "WIT_R14", "WIT_R15"]},
+  {"id": "cursed", "ru": "Под проклятием", "en": "Under a Curse", "cards": ["WIT_C19", "WIT_C22", "WIT_R02", "WIT_E17", "WIT_M08"]},
+  {"id": "vampires", "ru": "Дети ночи", "en": "Children of the Night", "cards": ["WIT_R07", "WIT_R08", "WIT_R09", "WIT_R10", "WIT_R11", "WIT_R12", "WIT_M07"]},
+  {"id": "witchers", "ru": "Ведьмаки", "en": "Witchers", "cards": ["WIT_M01", "WIT_L01", "WIT_L02", "WIT_L03", "WIT_L04", "WIT_L05", "WIT_E16"]},
+  {"id": "novigrad", "ru": "Новиград", "en": "Novigrad", "cards": ["WIT_L06", "WIT_L07", "WIT_L16", "WIT_E11", "WIT_R23"]},
+  {"id": "beauclair", "ru": "Туссент", "en": "Toussaint", "cards": ["WIT_E04", "WIT_E05", "WIT_R27", "WIT_R28", "WIT_L14"]},
+  {"id": "skellige", "ru": "Ярлы Скеллиге", "en": "Jarls of Skellige", "cards": ["WIT_E19", "WIT_E20", "WIT_E21", "WIT_E22", "WIT_E23", "WIT_E24"]},
+  {"id": "velen", "ru": "Семья Барона", "en": "The Baron's Family", "cards": ["WIT_R24", "WIT_R25", "WIT_R26"]},
+  {"id": "hunt", "ru": "Дикая Охота", "en": "The Wild Hunt", "cards": ["WIT_M09", "WIT_E06", "WIT_E07", "WIT_E08", "WIT_L17"]},
+  {"id": "sorceresses", "ru": "Чародейки", "en": "Sorceresses", "cards": ["WIT_M02", "WIT_M04", "WIT_L10", "WIT_L11", "WIT_L12", "WIT_L13", "WIT_E09", "WIT_E10"]},
+  {"id": "northern-realms", "ru": "Северные королевства", "en": "The Northern Realms", "cards": ["WIT_E01", "WIT_E02", "WIT_E12", "WIT_E14", "WIT_R22"]},
+  {"id": "nilfgaard", "ru": "Нильфгаард", "en": "Nilfgaard", "cards": ["WIT_M05", "WIT_M06", "WIT_E13", "WIT_L09", "WIT_L15"]},
+  {"id": "brokilon", "ru": "Брокилон и Скоя’таэли", "en": "Brokilon & Scoia’tael", "cards": ["WIT_E03", "WIT_E15", "WIT_L08"]},
+  {"id": "elder-blood", "ru": "Дитя Старшей Крови", "en": "Child of the Elder Blood", "cards": ["WIT_M03", "WIT_R21"]}
+]

@@ -8,7 +8,7 @@ const buttons=[...document.querySelectorAll('[data-size]')];
 const grants=[...document.querySelectorAll('[data-grant]')];
 const testPanel=$('testPanel'), clearConfirm=$('clearConfirm');
 const dustConfirm=$('dustConfirm');
-const testerButtons=[...grants,$('clearCollection'),$('resetShuffle'),$('clearDust'),$('renewBoard')];
+const testerButtons=[...grants,$('clearCollection'),$('resetShuffle'),$('clearDust'),$('renewBoard'),$('grantAllCards')];
 const toolButtons=[...document.querySelectorAll('[data-tool]')];
 const local=document.body.dataset.mode==='local';
 const tg=local?null:window.Telegram?.WebApp;
@@ -58,11 +58,14 @@ function accept(out){
  if(typeof out.canGrantSpins==='boolean')canGrantSpins=out.canGrantSpins;
 }
 function remember(){try{if(pending)sessionStorage.setItem(key,JSON.stringify(pending));else sessionStorage.removeItem(key);}catch{}}
-const albumArtUrl=id=>`/art/album/${id}.webp`;
+// Revise only the substituted artwork, including previews cached on phones.
+const artRevisions=new Map([['WIT_C19','4acc3a929f3e'],['WIT_C23','3b5d13de94da'],['WIT_C26','b9c0d4ec3389'],['WIT_C36','fd3bbde1afcc']]);
+const cardArtUrl=(id,preview=false)=>`/art/${preview?'album/':''}${id}.webp${artRevisions.has(id)?`?v=${artRevisions.get(id)}`:''}`;
+const albumArtUrl=id=>cardArtUrl(id,true);
 function media(id,locked=false,eager=false,preview=false){
  const el=node('span',locked?'◇':rarities[id[4]][1],'media');el.setAttribute('aria-hidden','true');
  if(!locked&&art.has(id)){
-  const original=`/art/${id}.webp`, img=new Image();img.alt='';img.loading=eager?'eager':'lazy';img.decoding='async';
+  const original=cardArtUrl(id), img=new Image();img.alt='';img.loading=eager?'eager':'lazy';img.decoding='async';
   img.onerror=()=>img.remove();
   if(preview)img.onerror=()=>{img.onerror=()=>img.remove();img.src=original;};
   img.src=preview?albumArtUrl(id):original;el.append(img);
@@ -351,6 +354,72 @@ function showShuffleReward(out){
  if(onShuffle)showShuffleReveal(out,title,extra,cardName);
  say(onShuffle?'':[title,extra,cardName].filter(Boolean).join(' · '));
 }
+const collectionPane='tool-collections';
+let collectionRenderKey;
+const collectionPayout=({influence,coins})=>I18n.text(`+${influence} влияния · +${coins} ${I18n.crowns(coins)}`,`+${influence} influence · +${coins} ${I18n.crowns(coins)}`);
+function collectionCard(id,owned){
+ const name=cards.get(id)[1];
+ const card=node(owned?'button':'div',undefined,`mini-card ${owned?'is-owned':'is-missing'}`);
+ card.dataset.r=id[4];
+ if(owned){card.type='button';bindDetail(card,id);}
+ else card.setAttribute('role','img');
+ card.setAttribute('aria-label',I18n.text(`${name} · ${owned?'в коллекции':'не получена'}`,`${name} · ${owned?'owned':'missing'}`));
+ card.title=name;
+ const image=node('span',undefined,'mini-card-art');
+ image.append(media(id,!owned,false,true));
+ const mark=node('span',owned?'✓':'◇','mini-card-mark');mark.setAttribute('aria-hidden','true');
+ image.append(mark);
+ card.append(image,node('span',name,'mini-card-name'));
+ return card;
+}
+function renderCollections(blocked){
+ const list=$('collectionsList'), sets=state?.collections??[];
+ const has=id=>qty(id)>0;
+ const key=JSON.stringify(sets.map(set=>[set.id,set.ru,set.en,set.influence,set.coins,set.claimed,set.cards.map(id=>[id,has(id),has(id)&&art.has(id)])]));
+ if(key!==collectionRenderKey){
+  collectionRenderKey=key;
+  let complete=0;
+  list.replaceChildren(...sets.map(set=>{
+   const count=set.cards.filter(has).length, ready=count===set.cards.length;
+   if(ready)complete++;
+   const panel=node('article',undefined,'mini-set');panel.dataset.collection=set.id;
+   const title=node('h2',I18n.text(set.ru,set.en));title.id=`mini-${set.id}`;
+   panel.setAttribute('aria-labelledby',title.id);
+   const top=node('div',undefined,'mini-set-top');
+   const progress=node('span',`${count} / ${set.cards.length}`,'mini-count');
+   progress.setAttribute('aria-label',I18n.text(`Собрано: ${count} из ${set.cards.length}`,`Collected: ${count} of ${set.cards.length}`));
+   top.append(title,progress);
+   const grid=node('div',undefined,'mini-cards');
+   grid.append(...set.cards.map(id=>collectionCard(id,has(id))));
+   const footer=node('div',undefined,'mini-set-footer');
+   footer.append(node('p',collectionPayout(set),'mini-payout'));
+   if(set.claimed){
+    const stamp=node('p',I18n.text('✓ Награда получена','✓ Reward claimed'),'mini-stamp');
+    stamp.tabIndex=-1;footer.append(stamp);
+   }else if(ready){
+    panel.classList.add('is-ready');
+    const claim=node('button',I18n.text('Забрать награду','Claim reward'),'primary mini-claim');claim.type='button';
+    claim.setAttribute('aria-label',I18n.text(`Забрать награду: ${set.ru}`,`Claim reward: ${set.en}`));
+    claim.onclick=()=>transact('claim-collection',0,1,{collection:set.id});
+    footer.append(claim);
+   }
+   panel.append(top,grid,footer);return panel;
+  }));
+  $('collectionsSummary').textContent=sets.length?I18n.text(`Подборок собрано: ${complete} из ${sets.length}`,`Sets complete: ${complete} of ${sets.length}`):I18n.text('Подборки пока недоступны.','Sets are not available yet.');
+ }
+ for(const claim of list.querySelectorAll('.mini-claim'))claim.disabled=blocked;
+}
+function celebrateCollection(reward,op,fromNavigation,replayed){
+ if(!reward||reward.id!==op.collection)return;
+ const text=I18n.text('Награда получена: ','Reward claimed: ')+collectionPayout(reward);
+ if(activePane!==collectionPane||targetPane()!==collectionPane||navigation!==fromNavigation){if(!replayed)say(text);return;}
+ renderCollections(true);
+ const panel=[...$('collectionsList').children].find(el=>el.dataset.collection===reward.id);
+ if(!panel)return;
+ $('collectionAnnouncement').textContent=text;
+ panel.querySelector('.mini-stamp')?.focus({preventScroll:true});
+ if(!motion.matches)panel.classList.add('mini-celebrate');
+}
 function refresh(){
  if(!state)return;
  const left=state.freeSpins, spins=state.spins??0, rewardSpins=state.rewardSpins??0, blocked=busy||!!pending;
@@ -373,10 +442,12 @@ function refresh(){
  $('resetShuffle').disabled=blocked||!canGrantSpins||shuffleReadyAt<=clock();
  $('clearDust').disabled=blocked||!canGrantSpins||!state.dust;
  $('renewBoard').disabled=blocked||!canGrantSpins;
+ $('grantAllCards').disabled=blocked||!canGrantSpins||catalog.every(([id])=>qty(id)>0);
+ if(activePane===collectionPane)renderCollections(blocked);
  refreshShuffle(blocked);refreshCraft(blocked);HuntUI.render(blocked);
  $('retry').hidden=!pending||busy;SeasonUI.block(blocked);
 }
-const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank','profile','glory','pack','detail','battle','hunt',...SettingsUI.screens];
+const panes=['home','album','tool-shuffle','tool-craft','tool-quests','tool-rank',collectionPane,'profile','glory','pack','detail','battle','hunt',...SettingsUI.screens];
 const rarityRank=new Map(rarityGroups.map(([r],i)=>[r,i]));
 let activePane=null, activeDetail=null, transition=null, navigation=0, hasPack=false, stopScene=null;
 const main=document.querySelector('main'), pageStamp=crypto.randomUUID();
@@ -400,7 +471,13 @@ async function route(){
  const id=targetPane();
  if(id==='home'&&['#pack','#detail'].includes(location.hash))history.replaceState(null,'','#home');
  const returning=activeDetail?.from===id?activeDetail:null;
- if(activePane!==id)stopScene?.();
+ if(activePane!==id){
+  stopScene?.();
+  if(activePane===collectionPane){
+   $('collectionAnnouncement').textContent='';
+   $('collectionsList').querySelectorAll('.mini-celebrate').forEach(panel=>panel.classList.remove('mini-celebrate'));
+  }
+ }
  if(id!=='tool-shuffle')hideShuffleReveal();
  const animate=!main.inert&&activePane&&activePane!==id&&!motion.matches&&$(id).animate;
  if(animate){
@@ -419,14 +496,16 @@ async function route(){
   const frames=id==='detail'?[{opacity:0,transform:'translateY(14px) scale(.98)'},{opacity:1,transform:'none'}]:[{opacity:0,transform:'translateY(5px)'},{opacity:1,transform:'none'}];
   transition=$(id).animate(frames,{duration:id==='detail'?240:165,easing:'ease-out'});
  }
- for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${['hunt','glory'].includes(id)?'battle':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
+ for(const a of document.querySelectorAll('nav a')){if(a.hash===`#${['hunt','glory'].includes(id)?'battle':id===collectionPane?'home':id}`)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
  if(id==='album')album();
+ if(id===collectionPane)renderCollections(busy||!!pending||!state);
  void SeasonUI.open(id);
  SettingsUI.open(id);
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open&&!dustConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo({top:returning?.top??0,behavior:'instant'});
  if(activeDetail)$('detailTitle').focus({preventScroll:true});
+ if(!main.inert&&id===collectionPane&&!returning)$('collections-title').focus({preventScroll:true});
  if(!main.inert&&SettingsUI.screens.includes(id)&&!returning)$(`${id}-title`).focus({preventScroll:true});
  if(returning)detailTriggers(id,returning.id)[returning.index]?.focus({preventScroll:true});
 }
@@ -668,7 +747,7 @@ async function sync(){
  const version=operationVersion;
  syncing=true;
  try{const out=await api('state');if(version===operationVersion){accept(out);refresh();if(!$('album').hidden)album();}}
- catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...testerButtons,$('break')])b.disabled=true;say(e.message);}}
+ catch(e){if(version===operationVersion&&e.status===401){state=null;canGrantSpins=false;if(testPanel)testPanel.hidden=true;for(const b of [...buttons,...testerButtons,$('break')])b.disabled=true;if(activePane===collectionPane)renderCollections(true);say(e.message);}}
  finally{syncing=false;}
 }
 const huntActions=new Set(['take-contract','save-deck','start-hunt','strike','auto-hunt']);
@@ -698,6 +777,8 @@ async function transact(kind,size,quantity=1,params){
   else if(op.kind==='craft')await craftAtBench(out.crafted,out.craftedQuantity??1);
   else if(op.kind==='activate-boost')say(I18n.text(`Активировано: ${boostInfo[out.activated][0]}`,`Activated: ${boostInfo[out.activated][0]}`));
   else if(op.kind==='grant')say(I18n.text(`Начислено тестовых круток: ${out.granted}`,`Test spins granted: ${out.granted}`));
+  else if(op.kind==='claim-collection')celebrateCollection(out.collectionReward,op,fromNavigation,out.replayed);
+  else if(op.kind==='test-grant-all')say(I18n.text(`Добавлено карт: ${out.cardsGranted}`,`Cards added: ${out.cardsGranted}`));
   else if(op.kind==='clear-collection'){
    resetTable(table(''));resetTable(table('pack-'));
    hasPack=false;$('packRest').hidden=true;$('packGrid').replaceChildren();
@@ -731,6 +812,7 @@ for(const [id,dialog,action] of [['clearCollection',clearConfirm,'clear-collecti
   if(canGrantSpins&&dialog.returnValue==='clear')transact(action,0);
  });
 }
+$('grantAllCards').onclick=()=>{if(canGrantSpins)transact('test-grant-all',0);};
 $('renewBoard').onclick=()=>{if(canGrantSpins)transact('renew-board',0);};
 $('resetShuffle').onclick=()=>{if(canGrantSpins)transact('reset-shuffle',0);};
 $('break').onclick=()=>transact('break',0);$('retry').onclick=()=>transact();
@@ -781,7 +863,7 @@ async function firstScreenArt(){
  for(const img of unready){
   if(img===back){for(const el of pane.querySelectorAll('.back,.stack,.shuffle-stack i'))el.classList.add('startup-back-fallback');}
   else if(img.classList.contains('deck-emblem'))img.style.visibility='hidden';
-  else if(activePane!=='album')img.remove();
+  else if(activePane!=='album'&&activePane!==collectionPane)img.remove();
  }
 }
 (async()=>{

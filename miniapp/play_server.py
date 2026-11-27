@@ -45,6 +45,32 @@ ROOT = WEB.parents[1]
 CATALOG = json.loads((ROOT/'cards.js').read_text().split('=',1)[1].strip().removesuffix(';'))
 CARDS = {c[0]:c for c in CATALOG}
 POOLS = {r:[c[0] for c in CATALOG if c[0][4]==r] for r in 'CRELM'}
+COLLECTION_REWARD = dict(influence=10, coins=3)
+
+
+def load_collections(path):
+    definitions = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(definitions, list):
+        raise ValueError('Expected an array of mini-collections in collections.json')
+    collections, covered = {}, set()
+    for entry in definitions:
+        if (not isinstance(entry, dict)
+                or not all(isinstance(entry.get(key), str) and entry[key].strip() for key in ('id', 'ru', 'en'))
+                or not isinstance(entry.get('cards'), list) or not entry['cards']):
+            raise ValueError('Invalid mini-collection in collections.json')
+        key, cards = entry['id'], entry['cards']
+        if key in collections or any(not isinstance(cid, str) or cid not in CARDS for cid in cards):
+            raise ValueError(f'Duplicate mini-collection ID or unknown card: {key}')
+        if len(set(cards)) != len(cards):
+            raise ValueError(f'Duplicate card within mini-collection: {key}')
+        collections[key] = {field: entry[field] for field in ('id', 'ru', 'en', 'cards')}
+        covered.update(cards)
+    if covered != CARDS.keys():
+        raise ValueError('Mini-collections must cover the complete catalog')
+    return collections
+
+
+COLLECTIONS = load_collections(WEB.parent / 'collections.json')
 DAY = 86400
 SHUFFLE_COOLDOWN = 2 * 3600
 # Weights are in basis points. The remainder of the roll awards ordinary dust.
@@ -56,8 +82,8 @@ REFERRAL_SPINS = 5
 PACK_SIZES = (1, 10, 50)
 GRANT_SIZES = (10, 50)
 MAX_TEST_SPINS = 500
-TEST_ACTIONS = {'grant': GRANT_SIZES, 'clear-collection': (0,), 'reset-shuffle': (0,),
-                'clear-dust': (0,), 'renew-board': (0,)}
+TEST_ACTIONS = {'grant': GRANT_SIZES, 'test-grant-all': (0,), 'clear-collection': (0,),
+                'reset-shuffle': (0,), 'clear-dust': (0,), 'renew-board': (0,)}
 # Recipe IDs are stable: the operation journal also uses them on retries.
 CRAFT_RECIPES = {
     1: dict(material='dust', cost=10, spins=1),
@@ -80,7 +106,7 @@ BOOSTED_DRAW_WEIGHTS['C'] -= sum(BOOSTED_DRAW_WEIGHTS.values()) - 10000
 DRAW_THRESHOLDS = tuple(accumulate(DRAW_WEIGHTS.values()))
 BOOSTED_DRAW_THRESHOLDS = tuple(accumulate(BOOSTED_DRAW_WEIGHTS.values()))
 ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), 'craft': tuple(CRAFT_RECIPES),
-                'activate-boost': tuple(BOOST_USES), 'edit-profile': (0,),
+                'activate-boost': tuple(BOOST_USES), 'edit-profile': (0,), 'claim-collection': (0,),
                 **TEST_ACTIONS, **dict.fromkeys(hunts.ACTIONS, (0,))}
 
 
@@ -89,6 +115,8 @@ def schema(db, *, now=None):
         CREATE TABLE IF NOT EXISTS players (uid TEXT PRIMARY KEY, state TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS operations (uid TEXT, op TEXT, kind TEXT, size INTEGER, result TEXT,
         PRIMARY KEY(uid,op));
+        CREATE TABLE IF NOT EXISTS collection_claims (uid TEXT NOT NULL, collection_id TEXT NOT NULL,
+        PRIMARY KEY(uid,collection_id));
         CREATE INDEX IF NOT EXISTS successful_draws ON operations (uid,op) WHERE kind='draw';
         CREATE TABLE IF NOT EXISTS draw_receipt_order (uid TEXT NOT NULL, op TEXT NOT NULL,
         position BIGINT NOT NULL, drawn_at BIGINT NOT NULL, PRIMARY KEY(uid,op), UNIQUE(uid,position));
@@ -257,9 +285,13 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
     if hunts.rename_saved_monsters(state):
         needs_save = True
     hunts.board_for(state, uid, now)
+    claimed_collections = {cid for (cid,) in execute(db, 'SELECT collection_id FROM collection_claims WHERE uid=?', (uid,))}
 
     def reply():
-        return dict(state=state, now=now, shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
+        collections = [{**entry, **COLLECTION_REWARD, 'claimed': cid in claimed_collections}
+                       for cid, entry in COLLECTIONS.items()]
+        return dict(state={**state, 'collections': collections}, now=now,
+                    shuffleReadyAt=state['lastBreak'] + SHUFFLE_COOLDOWN if state['lastBreak'] else 0,
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
                                         weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES,
                     maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')),
@@ -293,6 +325,11 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
     params = {hunts.ACTIONS[kind]: data.get(hunts.ACTIONS[kind])} if kind in hunts.ACTIONS else {}
     if kind == 'edit-profile':
         params = {key: data[key] for key in ('name', 'avatar', 'frame') if key in data}
+    elif kind == 'claim-collection':
+        cid = data.get('collection')
+        if not isinstance(cid, str):
+            return 400, {'error': 'Мини-коллекция не найдена'}
+        params = {'collection': cid}
     if kind == 'strike':
         params['contract'] = data.get('contract')
         if type(params['turn']) is not int:
@@ -302,7 +339,10 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         # Legacy craft results describe a single recipe execution.
         result = json.loads(old[2])
         old_season = result.pop('receiptSeason', baseline)
-        old_params = result.get('profileParams', result.get('huntParams', {}))
+        if old[0] == 'claim-collection':
+            old_params = {'collection': result['collectionReward']['id']}
+        else:
+            old_params = result.get('profileParams', result.get('huntParams', {}))
         if old[:2] != (kind,size) or result.get('craftedQuantity', 1) != quantity or old_params != params:
             return 409, {'error':'Операция уже использована'}
         if old_season != season:
@@ -310,6 +350,8 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         if pending_rewards:
             save()
             db.commit()
+        if kind == 'claim-collection':
+            result['replayed'] = True
         return 200, {**reply(),**result}
     if data.get('season', season) != season:
         return 409, {'error': 'Начался новый сезон. Повтори действие после обновления'}
@@ -319,6 +361,19 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         if error:
             return 400, {'error': error}
         result = dict(profileParams=params)
+    elif kind == 'claim-collection':
+        collection = COLLECTIONS.get(cid)
+        if collection is None:
+            return 400, {'error': 'Мини-коллекция не найдена'}
+        if cid in claimed_collections:
+            return 409, {'error': 'Награда за мини-коллекцию уже получена'}
+        if not all(owned.get(card, 0) > 0 for card in collection['cards']):
+            return 409, {'error': 'Мини-коллекция ещё не собрана'}
+        execute(db, 'INSERT INTO collection_claims VALUES (?,?)', (uid, cid))
+        claimed_collections.add(cid)
+        for currency, amount in COLLECTION_REWARD.items():
+            state[currency] += amount
+        result = dict(collectionReward={'id': cid, **COLLECTION_REWARD})
     elif kind in hunts.ACTIONS:
         status, result = hunts.action(state, CARDS, kind, params)
         if status != 200:
@@ -384,6 +439,10 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
             return 409, {'error':f'Лимит тестовых круток: {MAX_TEST_SPINS}'}
         state['spins'] += size
         result = dict(granted=size)
+    elif kind == 'test-grant-all':
+        missing = [cid for cid in CARDS if owned.get(cid, 0) <= 0]
+        owned.update(dict.fromkeys(missing, 1))
+        result = dict(cardsGranted=len(missing))
     elif kind == 'clear-collection':
         result = dict(removed=len(owned))
         state['owned'] = {}
@@ -440,6 +499,8 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         # The invitee is already locked. This writes no inviter state and commits with the draw receipt.
         execute(db, 'UPDATE referrals SET earned=1 WHERE invitee=? AND earned=0', (uid,))
     db.commit()
+    if kind == 'claim-collection':
+        result['replayed'] = False
     return 200, {**reply(),**result}
 
 

@@ -191,9 +191,10 @@ class FullGame(unittest.TestCase):
             server.origin, server.allowed = 'https://example.invalid', {1}
             worker = Thread(target=server.serve_forever, daemon=True)
             worker.start()
-            def post(sid='', origin=server.origin, kind='grant'):
+            def post(sid='', origin=server.origin, kind='grant', **params):
                 with closing(HTTPConnection(*server.server_address, timeout=3)) as conn:
-                    conn.request('POST', f'/api/{kind}', json.dumps({'op':f'operation-{kind}-000001','size':50 if kind=='grant' else 0,'uid':'tg:2'}),
+                    conn.request('POST', f'/api/{kind}', json.dumps({'op':f'operation-{kind}-000001',
+                                 'size':50 if kind=='grant' else 0,'uid':'tg:2', **params}),
                                  {'Content-Type':'application/json','Origin':origin,
                                   'Cookie':f'__Host-grim-play={sid}'})
                     response = conn.getresponse()
@@ -204,10 +205,20 @@ class FullGame(unittest.TestCase):
                     self.assertEqual(post('removed', kind=kind)[0], 401)
                     self.assertEqual(post('allowed', 'https://other.invalid', kind)[0], 403)
                     self.assertEqual(post('allowed', kind=kind)[0], 200)
+                self.assertEqual(self.run_play('state', uid='tg:2')[1]['state']['owned'], {})
                 status, result = post('allowed')
                 self.assertEqual((status, result['state']['spins']), (200, 50))
                 self.assertEqual(self.run_play('state', uid='tg:2')[1]['state']['spins'], 0)
                 self.assertEqual(post('allowed')[1]['state']['spins'], 50)
+                self.assertEqual(post('allowed', kind='test-grant-all', op='grant-cards-again')[0], 200)
+                claim = dict(kind='claim-collection', collection=next(iter(game.COLLECTIONS)))
+                self.assertEqual(post(**claim)[0], 401)
+                self.assertEqual(post('removed', **claim)[0], 401)
+                self.assertEqual(post('allowed', 'https://other.invalid', **claim)[0], 403)
+                status, out = post('allowed', **claim)
+                self.assertEqual((status, out['replayed'], out['collectionReward']['id']),
+                                 (200, False, claim['collection']))
+                self.assertTrue(post('allowed', **claim)[1]['replayed'])
             finally:
                 server.shutdown()
                 worker.join()
@@ -216,6 +227,85 @@ class FullGame(unittest.TestCase):
         state = {**self.run_play('state')[1]['state'], **fields}
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('UPDATE players SET state=? WHERE uid=?', (json.dumps(state), 'A'))
+
+    def test_collection_projection_and_ownership_checks(self):
+        _, out = self.run_play('state')
+        entries = out['state']['collections']
+        self.assertEqual({cid for entry in entries for cid in entry['cards']}, game.CARDS.keys())
+        self.assertEqual(len(entries), len(game.COLLECTIONS))
+        for entry in entries:
+            self.assertEqual(entry, {**game.COLLECTIONS[entry['id']], 'influence': 10, 'coins': 3, 'claimed': False})
+        first = entries[0]
+        for invalid in (None, [], 'unknown'):
+            self.assertEqual(self.run_play('claim-collection', collection=invalid)[0], 400)
+        owned = dict.fromkeys(first['cards'], 2)
+        owned[first['cards'][0]] = 0
+        self.seed(owned=owned)
+        status, result = self.run_play('claim-collection', collection=first['id'])
+        self.assertEqual(status, 409)
+        self.assertNotIn('collectionReward', result)
+        self.assertEqual(self.run_play('state')[1]['state']['coins'], 7)
+
+    def test_grant_all_preserves_copies_and_does_not_grant_currency_or_progress(self):
+        a, b = list(game.CARDS)[:2]
+        self.seed(owned={a: 5, b: 0}, coins=19, influence=12, dust=3, spins=8)
+        before = self.run_play('state')[1]['state']
+        status, out = self.run_play('test-grant-all')
+        self.assertEqual((status, out['cardsGranted']), (200, len(game.CARDS)-1))
+        granted = out['state']
+        self.assertEqual(granted['owned'], {**dict.fromkeys(game.CARDS, 1), a: 5})
+        for key in ('coins', 'influence', 'dust', 'spins', 'board', 'collections'):
+            self.assertEqual(granted[key], before[key])
+        self.assertNotIn('collectionReward', out)
+        self.assertEqual(self.run_play('test-grant-all'), (200, out))
+        self.assertEqual(self.run_play('test-grant-all', 2)[1]['cardsGranted'], 0)
+        self.assertEqual(self.run_play('state', uid='B')[1]['state']['owned'], {})
+
+    def test_collection_receipt_is_bound_to_one_set_and_claim_survives_clear_and_rollover(self):
+        first, second, *_ = game.COLLECTIONS
+        self.run_play('test-grant-all', 1)
+        status, out = self.run_play('claim-collection', 2, collection=first)
+        receipt = dict(id=first, influence=10, coins=3)
+        self.assertEqual((status, out['collectionReward'], out['replayed']), (200, receipt, False))
+        self.assertEqual((out['state']['influence'], out['state']['coins']), (10, 10))
+        self.assertEqual({entry['id'] for entry in out['state']['collections'] if entry['claimed']}, {first})
+        self.assertEqual(self.run_play('claim-collection', 2, collection=first), (200, {**out, 'replayed': True}))
+        self.assertEqual(self.run_play('claim-collection', 2, collection=second)[0], 409)
+        self.run_play('clear-collection', 3)
+        replay = self.run_play('claim-collection', 2, collection=first)[1]
+        self.assertEqual((replay['collectionReward'], replay['replayed'], replay['state']['owned']), (receipt, True, {}))
+        status, out = self.run_play('claim-collection', 4, collection=first)
+        self.assertEqual(status, 409)
+        self.assertNotIn('collectionReward', out)
+        after = game.seasons.calendar(100000)[1]
+        self.assertEqual(self.run_play('claim-collection', 2, collection=first, now=after)[0], 409)
+        self.run_play('test-grant-all', 5, now=after)
+        self.assertEqual(self.run_play('claim-collection', 6, collection=first, now=after)[0], 409)
+        status, out = self.run_play('claim-collection', 7, collection=second, now=after)
+        self.assertEqual((status, out['state']['influence'], out['state']['coins']), (200, 10, 13))
+        self.run_play('test-grant-all', 1, uid='B')
+        self.assertEqual(self.run_play('claim-collection', 2, uid='B', collection=first)[0], 200)
+
+    def test_collection_claims_are_serialized_and_roll_back_without_the_receipt(self):
+        first, second, *_ = game.COLLECTIONS
+        self.run_play('test-grant-all', 1)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('''CREATE TRIGGER fail_collection_receipt BEFORE INSERT ON operations
+                       WHEN NEW.kind='claim-collection' BEGIN SELECT RAISE(ABORT, 'test rollback'); END''')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.run_play('claim-collection', 2, collection=first)
+        state = self.run_play('state')[1]['state']
+        self.assertEqual((state['coins'], state['influence']), (7, 0))
+        self.assertFalse(any(entry['claimed'] for entry in state['collections']))
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('DROP TRIGGER fail_collection_receipt')
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(lambda n: self.run_play('claim-collection', n, collection=first), (2, 3)))
+            replays = list(pool.map(lambda n: self.run_play('claim-collection', n, collection=second), (4, 4)))
+        self.assertEqual(sorted(status for status, _ in responses), [200, 409])
+        self.assertEqual(sorted(out['replayed'] for status, out in replays if status == 200), [False, True])
+        state = self.run_play('state')[1]['state']
+        self.assertEqual((state['coins'], state['influence']), (13, 20))
 
     def test_craft_recipes_spend_materials_and_preserve_last_copies(self):
         owned = {'WIT_C01': 7, 'WIT_C02': 5, 'WIT_C03': 1, 'WIT_R01': 11,

@@ -7,7 +7,7 @@ const HuntUI=(()=>{
   ["Земляной элементаль", "Earth Elemental"],
   ["Огненный элементаль", "Fire Elemental"],
   ["Ледяной элементаль", "Ice Elemental"],
-  ["Ифрит", "Ifrit"],
+  ["Игоша", "Botchling"],
   ["Голем", "Golem"],
   ["Волколак", "Werewolf"],
   ["Полуденница", "Noonwraith"],
@@ -20,7 +20,13 @@ const HuntUI=(()=>{
   ["Вилохвост", "Forktail"],
   ["Грифон", "Griffin"]
  ]);
- const monsterName=name=>t(name,monsters.get(name)??name);
+ // A replayed operation receipt may still contain the old monster name.
+ const canonicalMonsterName=name=>name==='Ифрит'?'Игоша':name;
+ const monsterName=name=>{
+  const canonical=canonicalMonsterName(name);
+  return t(canonical,monsters.get(canonical)??canonical);
+ };
+ const monsterArt=info=>info.art??huntPortraits?.[canonicalMonsterName(info.name)];
  const slots=()=>state?.deck??Array(6).fill(null);
  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  let renderKey='', animating=false, pickerSlot=null, rewardPlaying=false;
@@ -146,7 +152,7 @@ const HuntUI=(()=>{
  }
  function enemy(info){
   const portrait=node('div',undefined,'hunt-portrait');
-  const id=info.art??huntPortraits?.[info.name];
+  const id=monsterArt(info);
   const image=id&&art.has(id)?media(id,false,true).querySelector('img'):null;
   if(image){
    portrait.classList.add('has-art');
@@ -195,7 +201,7 @@ const HuntUI=(()=>{
   $('huntReturn').hidden=!fight||fight.status==='active';
   $('huntDeck').replaceChildren();$('huntOutcome').textContent='';$('huntOutcome').className='';
   const monster=$('huntEnemy');
-  const portraitKey=fight?JSON.stringify([fight.id,fight.monster.name,fight.monster.art??huntPortraits?.[fight.monster.name],art.size]):'';
+  const portraitKey=fight?JSON.stringify([fight.id,fight.monster.name,monsterArt(fight.monster),art.size]):'';
   if(monster.dataset.portrait!==portraitKey){
    monster.replaceChildren(...(fight?[enemy(fight.monster)]:[]));
    monster.dataset.portrait=portraitKey;

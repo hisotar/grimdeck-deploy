@@ -545,3 +545,38 @@ nav a span{white-space:nowrap;letter-spacing:0}
 .history-new{color:var(--green)}
 html[data-motion=off] :is(main,dialog),html[data-motion=off] :is(main,dialog) *,html[data-motion=off] :is(main,dialog) *::before,html[data-motion=off] :is(main,dialog) *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 .setting-sigil svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* Mini-collections: engraved set panels, iron silhouettes and gold claim seal. */
+.deck-tools-grid .mini-launch{grid-column:1/-1;grid-auto-flow:column;align-items:center;justify-content:center;gap:9px;min-height:51px}
+.mini-intro{margin:5px 0 12px;color:var(--muted)}
+.mini-summary{margin:0 0 12px;color:#ead5ad;font-weight:700}
+.mini-list{display:grid;gap:14px}
+.mini-set{position:relative;isolation:isolate;padding:11px;border:1px solid var(--steel-edge);border-radius:10px;background:radial-gradient(ellipse at top left,#89704c24,transparent 72%),var(--iron);box-shadow:var(--recess)}
+.mini-set.is-ready{border-color:#a88c5e}
+.mini-set-top,.mini-set-footer{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.mini-set-top h2{margin:0;flex:1;min-width:0;color:#efe1ca;font-size:clamp(18px,5.5vw,22px);overflow-wrap:anywhere}
+.mini-count{padding:2px 8px;border:1px solid #5f5545;border-radius:99px;color:#e9d5b2;background:#171714;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:10px 0}
+.mini-card,.mini-card.is-owned{display:grid;grid-template-rows:auto 1fr;gap:4px;min-width:0;min-height:0;padding:3px;border:1px solid #4c4e4b;border-radius:6px;color:#cec8bb;background:#1b1c1c;text-align:center}
+.mini-card.is-owned{border-color:var(--tone,#b99b66);color:#f3e8cf;background:linear-gradient(#3b3325,#211d17);box-shadow:0 0 8px -1px var(--tone,#b99b66),inset 0 0 0 1px #18120c}
+.mini-card-art{position:relative;display:block;overflow:hidden;aspect-ratio:2/3;border-radius:3px;background:#282927}
+.mini-card-art .media{min-height:0;height:100%;color:#d6c4a8;border-radius:0;font-size:23px}
+.is-missing .mini-card-art::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 20% 80%,#c1cbd37d,transparent 55%),radial-gradient(ellipse at 83% 36%,#a1aeb17d,transparent 62%),linear-gradient(155deg,#06090b66,#343c41c9,#080a0c66)}
+.mini-card-mark{position:absolute;z-index:1;inset:auto 2px 2px auto;display:grid;place-items:center;width:14px;height:14px;line-height:1;border-radius:50%;font-size:10px;background:#1a1b1c;color:#e4ddd1}
+.is-owned .mini-card-mark{background:#2c2416;color:#ffe3a3}
+.mini-card-name{font-size:10px;line-height:1.15;overflow-wrap:anywhere}
+.mini-set-footer{padding-top:8px;border-top:1px solid #544b3c}
+.mini-payout,.mini-stamp{margin:0;font-size:13px;color:#e9d6b1}
+.mini-stamp{font-weight:700;color:#ffdfa0}
+.mini-claim{padding-inline:10px;font-size:12px}
+.mini-announcement{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+@media(min-width:375px){.mini-cards{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(prefers-reduced-motion:no-preference){
+ .mini-celebrate{animation:mini-seal 750ms ease-out}
+ .mini-celebrate .mini-card-art::before{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;background:linear-gradient(112deg,transparent 16%,#fff4cdcf 46%,#ffc3696b 55%,transparent 77%);animation:mini-shine 720ms ease-out both}
+ .mini-celebrate .mini-card:nth-child(even) .mini-card-art::before{animation-delay:80ms}
+ .mini-celebrate .mini-stamp{animation:mini-stamp 600ms cubic-bezier(.2,.8,.2,1) both}
+}
+@keyframes mini-seal{0%{box-shadow:0 0 0 #ebbf65}30%{box-shadow:0 0 23px #ebbf6599}100%{box-shadow:var(--recess)}}
+@keyframes mini-shine{0%{transform:translateX(-110%);opacity:0}25%{opacity:.95}100%{transform:translateX(110%);opacity:0}}
+@keyframes mini-stamp{0%{opacity:0;transform:translateY(5px) scale(.92)}60%{opacity:1;transform:translateY(0) scale(1.03)}100%{transform:none}}

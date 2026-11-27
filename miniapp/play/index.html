@@ -132,11 +132,12 @@ const grimBoot=(()=>{
   <button type="button" data-tool="craft" aria-controls="tool-craft" data-i18n-text="Crafting"><span aria-hidden="true">⚒</span>Крафт</button>
   <button type="button" data-tool="quests" aria-controls="tool-quests" data-i18n-text="Quests"><span aria-hidden="true">✦</span>Задания</button>
   <button type="button" data-tool="rank" aria-controls="tool-rank" data-i18n-text="Leaderboard"><span aria-hidden="true">♜</span>Топ</button>
+  <button class="mini-launch" type="button" data-tool="collections" aria-controls="tool-collections" data-i18n-text="Mini-collections"><span aria-hidden="true">❖</span>Мини-коллекции</button>
  </div>
 </section>
 <details><summary data-i18n-text="Rules and odds">Правила и шансы</summary><p data-i18n-text="Get 1 free spin every 3 hours, up to 5. The spin counter includes every spin you have, including ones from crafting and shuffling. Crowns only cover the spins you are missing. Each pack opens in full.">+1 бесплатная крутка каждые 3 часа, максимум 5. Счётчик «Крутки» показывает все крутки в запасе, включая полученные за крафт и перетасовку. Монеты расходуются только на недостающие крутки. Пакет открывается целиком.</p><p id="drawChances" hidden></p></details>
 <details id="testPanel" hidden><summary data-i18n-text="Tester panel">Панель тестировщика</summary><p id="testSpins" data-i18n-text="Test spins: —">Тестовые крутки: —</p>
- <div class="actions test-actions"><button type="button" data-grant="10" disabled data-i18n-text="+10 spins">+10 круток</button><button type="button" data-grant="50" disabled data-i18n-text="+50 spins">+50 круток</button><button id="resetShuffle" type="button" disabled data-i18n-text="Reset shuffle timer">Сбросить таймер перетасовки</button><button id="clearDust" class="danger" type="button" disabled data-i18n-text="Clear dust">Обнулить пыль</button><button id="renewBoard" type="button" disabled data-i18n-text="Refresh quests">Обновить задания</button><button id="clearCollection" class="danger" type="button" disabled data-i18n-text="Delete all cards">Удалить все карты</button></div>
+ <div class="actions test-actions"><button type="button" data-grant="10" disabled data-i18n-text="+10 spins">+10 круток</button><button type="button" data-grant="50" disabled data-i18n-text="+50 spins">+50 круток</button><button id="resetShuffle" type="button" disabled data-i18n-text="Reset shuffle timer">Сбросить таймер перетасовки</button><button id="clearDust" class="danger" type="button" disabled data-i18n-text="Clear dust">Обнулить пыль</button><button id="renewBoard" type="button" disabled data-i18n-text="Refresh quests">Обновить задания</button><button id="grantAllCards" type="button" disabled data-i18n-text="Get all cards">Получить все карты</button><button id="clearCollection" class="danger" type="button" disabled data-i18n-text="Delete all cards">Удалить все карты</button></div>
 </details></section>
  <!-- tool pages -->
  <section id="tool-shuffle" class="deck-tool" aria-label="Перетасовка" hidden data-i18n-aria-label="Shuffle">
@@ -210,6 +211,14 @@ const grimBoot=(()=>{
   <p class="hunt-note" data-i18n-text="New notices daily at 00:00 MSK">Новые объявления каждый день в 00:00 МСК</p>
   <a id="questHunt" class="hunt-link hunt-forward" href="#battle" hidden><span data-i18n-text="To the hunt">К охоте</span><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg></a>
   <div class="quest-posting"><div class="quest-plaque" aria-hidden="true" data-i18n-text="NOTICES AND CONTRACTS"><span>✦</span> ОБЪЯВЛЕНИЯ И ЗАКАЗЫ <span>✦</span></div><div id="questBoard" class="quest-board"></div></div>
+ </section>
+ <section id="tool-collections" class="deck-tool" aria-labelledby="collections-title" hidden>
+  <a class="deck-back" href="#home"><svg class="deck-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#nav-arrow"/></svg><span data-i18n-text="Deck">Колода</span></a>
+  <h1 id="collections-title" tabindex="-1" data-i18n-text="Mini-collections">Мини-коллекции</h1>
+  <p class="mini-intro" data-i18n-text="Collect all the cards in a set to claim its reward once.">Собери все карты подборки, чтобы один раз забрать её награду.</p>
+  <p id="collectionsSummary" class="mini-summary"></p>
+  <div id="collectionsList" class="mini-list"></div>
+  <div id="collectionAnnouncement" class="mini-announcement" role="status" aria-atomic="true"></div>
  </section>
  <section id="battle" class="deck-tool" aria-labelledby="battleTitle" hidden>
   <h1 id="battleTitle" data-i18n-text="Battle">Бой</h1>
