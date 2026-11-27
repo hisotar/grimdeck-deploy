@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const rarities={C:[I18n.text('Обычная','Common'),'♠',34],R:[I18n.text('Редкая','Rare'),'✧',27],E:[I18n.text('Эпическая','Epic'),'☾',21],L:[I18n.text('Легендарная','Legendary'),'♜',16],M:[I18n.text('Мифическая','Mythic'),'✦',2]};
+const rarities={C:[I18n.text('Обычная','Common'),'♠'],R:[I18n.text('Редкая','Rare'),'✧'],E:[I18n.text('Эпическая','Epic'),'☾'],L:[I18n.text('Легендарная','Legendary'),'♜'],M:[I18n.text('Мифическая','Mythic'),'✦']};
 const rarityGroups=[['M',I18n.text('Мифические','Mythic')],['L',I18n.text('Легендарные','Legendary')],['E',I18n.text('Эпические','Epic')],['R',I18n.text('Редкие','Rare')],['C',I18n.text('Обычные','Common')]];
 const catalog=window.GRIM_CARDS;
 const cards=new Map(catalog.map(c=>[c[0],c]));
@@ -23,7 +23,8 @@ async function waitForFrame(image){
  finally{clearTimeout(timer);}
 }
 let state, shuffleReadyAt=0, offset=0, busy=false, pending=null, art=new Set(), key, syncing=false, canGrantSpins=false;
-let shuffleMastery, craftRecipes, huntTarget, seasonEndsAt;
+let shuffleMastery, craftRecipes, huntTarget, seasonEndsAt, drawOdds, huntPortraits, contractTactic;
+let spinInfluence=1;
 const clock=()=>Math.floor(Date.now()/1000)+offset;
 const node=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const say=text=>{$('notice').textContent=text;};
@@ -48,6 +49,8 @@ function accept(out){
  }
  offset=out.now-Math.floor(Date.now()/1000);
  shuffleReadyAt=out.shuffleReadyAt??(state.lastBreak?state.lastBreak+7200:0);
+ drawOdds=out.drawOdds??drawOdds;huntPortraits=out.huntPortraits??huntPortraits;spinInfluence=out.spinInfluence??spinInfluence;
+ contractTactic=out.contractTactic;
  if(out.shuffleMastery)shuffleMastery=out.shuffleMastery;
  if(out.craftRecipes)craftRecipes=out.craftRecipes;
  if(out.maxCraftBatch)craftLimit=out.maxCraftBatch;
@@ -68,13 +71,13 @@ function cardPortrait(id,eager=false){
  return portrait;
 }
 function renderDetail(id){
- const [,name,lore,atk,hp,value,dust]=cards.get(id), [rarity,mark]=rarities[id[4]];
+ const [,name,lore,atk,hp]=cards.get(id), [rarity,mark]=rarities[id[4]];
  $('detail').dataset.r=id[4];
  $('detailArt').replaceChildren(cardPortrait(id,true));
  $('detailTitle').textContent=name;
  $('detailRarity').textContent=`${mark} ${rarity}`;
  $('detailLore').textContent=lore;
- $('detailStats').replaceChildren(...[[I18n.text('Атака','Attack'),atk],[I18n.text('Здоровье','Health'),hp],[I18n.text('Ценность','Value'),value],[I18n.text('Пыль за лишнюю копию','Dust per duplicate'),dust]].map(([label,value])=>{
+ $('detailStats').replaceChildren(...[[I18n.text('Атака','Attack'),atk],[I18n.text('Здоровье','Health'),hp],[I18n.text('Влияние','Influence'),I18n.text(`+${spinInfluence} за крутку`,`+${spinInfluence} per spin`)]].map(([label,value])=>{
   const stat=node('div');stat.append(node('dt',label),node('dd',value));return stat;
  }));
 }
@@ -248,11 +251,23 @@ function refreshCraft(blocked){
   status.textContent=I18n.text(`В запасе: ${n}${arenaRunes.has(boost)?' · Арена ещё не открыта':left?` · Осталось применений: ${left}`:''}`,`In stock: ${n}${arenaRunes.has(boost)?' · Arena not open yet':left?` · Uses left: ${left}`:''}`);
   button.disabled=blocked||!n||!!left||arenaRunes.has(boost);
  }
- for(const [id,kind,text] of [['drawBoost','draw',I18n.text(`×1,5 к шансу легендарных и мифических · 24% и 3%`,`×1.5 legendary and mythic odds · 24% and 3%`)],['shuffleBoost','shuffle',I18n.text('+1 к мастерству перетасовки','+1 shuffle mastery')]]){
+ const percent=new Intl.NumberFormat(I18n.lang==='en'?'en-GB':'ru-RU',{style:'percent',maximumFractionDigits:2});
+ const fmt=bp=>percent.format(bp/10000).replace(/\s+%/,'%');
+ const boosted=drawOdds?.boosted;
+ const drawBoost=boosted?I18n.text(`Усиленные шансы: легендарная ${fmt(boosted.L)} · мифическая ${fmt(boosted.M)}`,`Boosted odds: legendary ${fmt(boosted.L)} · mythic ${fmt(boosted.M)}`):I18n.text('×1,5 к шансу легендарных и мифических','×1.5 legendary and mythic odds');
+ for(const [id,kind,text] of [['drawBoost','draw',drawBoost],['shuffleBoost','shuffle',I18n.text('+1 к мастерству перетасовки','+1 shuffle mastery')]]){
   const el=$(id), left=active[kind]||0;
   el.hidden=!left;if(left)el.textContent=I18n.text(`${text} · Осталось: ${left}`,`${text} · Uses left: ${left}`);
  }
- const chances=$('drawChances');chances.textContent=I18n.text(`Обычная ${active.draw?25:34}% · редкая 27% · эпическая 21% · легендарная ${active.draw?24:16}% · мифическая ${active.draw?3:2}%. Внутри редкости шансы карт равны.`,`Common ${active.draw?25:34}% · rare 27% · epic 21% · legendary ${active.draw?24:16}% · mythic ${active.draw?3:2}%. All cards of the same rarity are equally likely.`);
+ const chances=$('drawChances');
+ chances.replaceChildren();
+ if(drawOdds){
+  const list=weights=>Object.entries(rarities).map(([r,[label]])=>`${label} ${fmt(weights[r])}`).join(' · ');
+  chances.append(node('span',list(drawOdds.base)));
+  if(active.draw)chances.append(node('span',I18n.text(`С усилителем (следующие ${active.draw}): `,`With a booster (next ${active.draw}): `)+list(drawOdds.boosted)));
+  chances.append(node('span',I18n.text('Внутри редкости шансы карт равны.','All cards of the same rarity are equally likely.')));
+ }
+ chances.hidden=!drawOdds;
 }
 for(const [id,isBoost] of [['craftSpinTab',false],['craftBoostTab',true]])$(id).onclick=()=>{
  $('craftSpinTab').setAttribute('aria-pressed',String(!isBoost));$('craftBoostTab').setAttribute('aria-pressed',String(isBoost));
@@ -388,7 +403,6 @@ async function route(){
  if(id==='album')album();
  void SeasonUI.open(id);
  SettingsUI.open(id);
- if(id==='hunt'&&!main.inert)HuntUI.resumed();
  if(id==='pack'&&$('notice').querySelector('.notice-link'))say('');
  if(id==='home'&&!clearConfirm.open&&!dustConfirm.open)tg?.BackButton?.hide();else tg?.BackButton?.show();
  window.scrollTo({top:returning?.top??0,behavior:'instant'});
@@ -765,6 +779,6 @@ async function firstScreenArt(){
   say(pending?I18n.text('Предыдущий запрос не завершён. Можно повторить.','The previous request did not finish. You can retry it.'):local?I18n.text('Локальный стенд · стартовый баланс 120 монет','Local test mode · 120 starting crowns'):'');
   await firstScreenArt();
   if(signal.aborted)return;
-  grimBoot.show(main);HuntUI.resumed();
+  grimBoot.show(main);
  }catch(e){grimBoot.fail(e.status?e.message:undefined);}
 })();

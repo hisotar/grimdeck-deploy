@@ -392,7 +392,11 @@ nav a[aria-current],.craft-switch button[aria-pressed=true],.mastery-steps [aria
 .battle-contract{margin-top:16px;padding:11px;border:1px solid #645641;border-radius:7px;background:#191813}
 .hunt-kicker{margin:0 0 .7rem;color:#c3ad83;font-size:.72rem;letter-spacing:.1em}
 .hunt-portrait{position:relative;isolation:isolate;min-height:126px;display:grid;align-content:end;justify-items:center;gap:4px;padding:12px;background:radial-gradient(ellipse at 50% 20%,#4a3d37,#211c1a 63%,#121212);border:1px solid #74604e;border-radius:5px;text-align:center}
-.hunt-portrait .media{position:absolute;inset:0;z-index:-1;overflow:hidden}.hunt-portrait .media::after{content:'';position:absolute;inset:0;background:linear-gradient(transparent 22%,#100e0be8 100%)}
+.hunt-portrait.has-art{min-height:clamp(136px,48vw,208px);overflow:hidden}
+.hunt-image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:-2;background:#161311}
+.hunt-portrait.has-art::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(transparent 48%,#100e0bec)}
+.hunt-portrait.has-art .hunt-sigil{display:none}
+#drawChances span{display:block}#drawChances span+span{margin-top:.35em}
 .hunt-portrait h2{margin:0;color:#fff0d5;text-shadow:0 2px 5px #111;font-size:clamp(1rem,5vw,1.55rem)}
 .hunt-sigil{color:#a29178;font-size:2.2rem;line-height:1}.enemy-health{margin:0;color:#ffd6bf;font-size:.88rem}#huntDeck{margin-top:10px}
 #huntOutcome:not(:empty){margin:.7rem 0;padding:10px;border:1px solid #78644c;border-radius:5px;text-align:center;background:#332420;color:#ffdec9}

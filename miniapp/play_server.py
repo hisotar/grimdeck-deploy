@@ -35,6 +35,7 @@ def connect(target):
     return sqlite3.connect(target)
 from contextlib import closing
 from datetime import datetime, timezone
+from itertools import accumulate
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from server import Handler, ThreadingHTTPServer, SimpleCookie, CookieError, signed_launch
@@ -72,8 +73,12 @@ CRAFT_RECIPES = {
 }
 MAX_CRAFT_BATCH = 99
 BOOST_USES = {7: 10, 8: 4}
-DRAW_THRESHOLDS = (34, 61, 82, 98, 100)
-BOOSTED_DRAW_THRESHOLDS = (25, 52, 73, 97, 100)
+# Basis points per individual spin. The draw rune adds 50% to L/M, paid by C.
+DRAW_WEIGHTS = dict(C=5900, R=2700, E=950, L=400, M=50)
+BOOSTED_DRAW_WEIGHTS = {**DRAW_WEIGHTS, 'L': DRAW_WEIGHTS['L'] * 3 // 2, 'M': DRAW_WEIGHTS['M'] * 3 // 2}
+BOOSTED_DRAW_WEIGHTS['C'] -= sum(BOOSTED_DRAW_WEIGHTS.values()) - 10000
+DRAW_THRESHOLDS = tuple(accumulate(DRAW_WEIGHTS.values()))
+BOOSTED_DRAW_THRESHOLDS = tuple(accumulate(BOOSTED_DRAW_WEIGHTS.values()))
 ACTION_SIZES = {'draw': PACK_SIZES, 'break': (0,), 'craft': tuple(CRAFT_RECIPES),
                 'activate-boost': tuple(BOOST_USES), 'edit-profile': (0,),
                 **TEST_ACTIONS, **dict.fromkeys(hunts.ACTIONS, (0,))}
@@ -256,7 +261,10 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
                     shuffleMastery=dict(count=shuffles, level=min(4, shuffles + 1), resetsAt=(utc_day + 1) * DAY,
                                         weights=SHUFFLE_BONUSES), craftRecipes=CRAFT_RECIPES,
                     maxCraftBatch=MAX_CRAFT_BATCH, huntTarget=hunts.counter_target(state.get('fight')),
-                    seasonEndsAt=ends)
+                    seasonEndsAt=ends, spinInfluence=seasons.SPIN_INFLUENCE,
+                    drawOdds=dict(base=DRAW_WEIGHTS, boosted=BOOSTED_DRAW_WEIGHTS),
+                    huntPortraits=hunts.PORTRAITS,
+                    contractTactic=hunts.tactic(state['contract']['name']) if state.get('contract') else None)
 
     def spend_boost(boost, units):
         left = active.get(boost, 0)
@@ -327,7 +335,7 @@ def play(db, uid, kind, data, bonus, now=None, *, telegram_defaults=None, start_
         cards = []
         boosted = spend_boost('draw', size)
         for i in range(size):
-            roll = secrets.randbelow(100)
+            roll = secrets.randbelow(10000)
             thresholds = BOOSTED_DRAW_THRESHOLDS if i < boosted else DRAW_THRESHOLDS
             rarity = next(r for r, threshold in zip('CRELM', thresholds) if roll < threshold)
             cid = secrets.choice(POOLS[rarity]); qty = owned.get(cid,0)

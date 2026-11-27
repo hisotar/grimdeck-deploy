@@ -8,15 +8,22 @@ MOSCOW = 3 * 3600
 MONSTERS = (
     ('Альгуль', 'WIT_C03', 1), ('Главоглаз', None, 2),
     ('Земляной элементаль', 'WIT_C16', 2), ('Огненный элементаль', 'WIT_C17', 3),
-    ('Водный элементаль', 'WIT_C18', 2), ('Ифрит', None, 3), ('Голем', 'WIT_C20', 2),
-    ('Волк альфа', None, 1), ('Полуденница', None, 1), ('Полуночница', None, 2),
-    ('Тролль', 'WIT_C32', 1), ('Хим', None, 3), ('Катакан', None, 2),
-    ('Брукса', None, 3), ('Леший', 'WIT_R03', 3), ('Вилохвост', None, 2),
+    ('Водный элементаль', 'WIT_C18', 2), ('Ифрит', 'WIT_C19', 3), ('Голем', 'WIT_C20', 2),
+    ('Волк альфа', 'WIT_C22', 1), ('Полуденница', 'WIT_C33', 1), ('Полуночница', 'WIT_C34', 2),
+    ('Тролль', 'WIT_C32', 1), ('Хим', 'WIT_R14', 3), ('Катакан', 'WIT_R08', 2),
+    ('Брукса', 'WIT_R07', 3), ('Леший', 'WIT_R03', 3), ('Вилохвост', 'WIT_R05', 2),
     ('Грифон', 'WIT_R01', 2),
 )
+PORTRAITS = {name: art for name, art, _ in MONSTERS if art}
+# Fixed by tier: empty slots do not make a contract easier. Existing fights keep their snapshot.
+MONSTER_STATS = {1: (81, 13), 2: (91, 16), 3: (104, 16)}  # (health, attack)
 REAR_HUNTERS = {'Полуденница', 'Полуночница', 'Катакан', 'Брукса', 'Вилохвост', 'Грифон'}
 ACTIONS = {'take-contract': 'contract', 'save-deck': 'slots', 'start-hunt': 'contract',
            'strike': 'turn'}
+
+
+def tactic(name):
+    return 'rear' if name in REAR_HUNTERS else 'front'
 
 
 def board_for(state, uid, now, *, renew=False):
@@ -109,13 +116,11 @@ def action(state, cards, kind, params):
             return 409, {'error': 'Заказ недоступен или охота уже началась'}
         units = [dict(id=cid, atk=cards[cid][3], hp=cards[cid][4], maxHp=cards[cid][4])
                  if cid in cards and owned.get(cid) else None for cid in state.get('deck', [None] * 6)]
-        count = sum(unit is not None for unit in units)
-        if not count:
+        if not any(units):
             return 409, {'error': 'Поставь на стол хотя бы одну карту'}
-        tier = contract['tier']
-        hp = (5 + tier * 2) if count == 1 else count * (6 + tier)
-        monster = {**contract, 'hp': hp, 'maxHp': hp, 'atk': min(2, tier) if count == 1 else tier + 1}
-        monster['tactic'] = 'rear' if contract['name'] in REAR_HUNTERS else 'front'
+        hp, atk = MONSTER_STATS[contract['tier']]
+        monster = {**contract, 'hp': hp, 'maxHp': hp, 'atk': atk}
+        monster['tactic'] = tactic(contract['name'])
         state['fight'] = dict(id=contract_id, turn=0, status='active', units=units, monster=monster)
         return 200, {'started': contract_id}
     if (not contract or not fight or fight['status'] != 'active' or fight['id'] != contract_id

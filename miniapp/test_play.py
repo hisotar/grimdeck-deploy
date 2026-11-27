@@ -109,7 +109,7 @@ class FullGame(unittest.TestCase):
         self.assertEqual((out['masteryUsed'], out['bonus'], out['gain']), (1, None, 1))
 
     def test_priority_and_full_price(self):
-        with patch.object(game.secrets,'randbelow',side_effect=[99,99,90,90]+[0]*7), patch.object(game.secrets,'choice',side_effect=['WIT_M01','WIT_M01','WIT_L01','WIT_L01']+['WIT_C01']*7):
+        with patch.object(game.secrets,'randbelow',side_effect=[9950,9999,9550,9949]+[0]*7), patch.object(game.secrets,'choice',side_effect=['WIT_M01','WIT_M01','WIT_L01','WIT_L01']+['WIT_C01']*7):
             self.run_play('draw',1,1)
             _, draw=self.run_play('draw',2,10)
             self.assertEqual((draw['featured'],draw['newCount'],
@@ -246,6 +246,25 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('activate-boost', 2, 10)[0], 400)
         self.assertEqual(self.run_play('state')[1]['state'], order['state'])
 
+    def test_draw_odds_boundaries_per_card_in_a_ten_pack(self):
+        cases = (
+            (False, (0, 5899, 5900, 8599, 8600, 9549, 9550, 9949, 9950, 9999)),
+            (True, (0, 5674, 5675, 8374, 8375, 9324, 9325, 9924, 9925, 9999)),
+        )
+        for n, (boosted, rolls) in enumerate(cases, 1):
+            with self.subTest(boosted=boosted):
+                self.seed(spins=10, activeBoosts={'draw': 10} if boosted else {})
+                with patch.object(game.secrets, 'randbelow', side_effect=rolls) as random_roll:
+                    status, out = self.run_play('draw', n, 10)
+                self.assertEqual(status, 200)
+                self.assertEqual([c['id'][4] for c in out['cards']], list('CCRREELLMM'))
+                self.assertEqual([call.args for call in random_roll.call_args_list], [(10000,)]*10)
+                self.assertEqual(out['state']['activeBoosts'], {})
+                self.assertEqual(out['drawOdds'], {
+                    'base': dict(C=5900, R=2700, E=950, L=400, M=50),
+                    'boosted': dict(C=5675, R=2700, E=950, L=600, M=75),
+                })
+
     def test_draw_boost_consumes_only_covered_cards_and_respects_retries(self):
         self.seed(boostInventory={'draw': 2}, coins=60)
         status, activated = self.run_play('activate-boost', 1, 7)
@@ -253,7 +272,7 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('activate-boost', 1, 7), (status, activated))
         self.assertEqual(self.run_play('activate-boost', 2, 7)[0], 409)
         self.assertEqual(self.run_play('draw', 2, 50, uid='B')[0], 409)
-        with patch.object(game.secrets, 'randbelow', side_effect=[73, 97, 25, 52, 24]+[97]*46):
+        with patch.object(game.secrets, 'randbelow', side_effect=[9325, 9925, 5675, 8375, 5674]+[9925]*46):
             _, first = self.run_play('draw', 3, 1)
             self.assertEqual(first['state']['activeBoosts'], {'draw': 9})
             _, pack = self.run_play('draw', 4, 50)
@@ -775,7 +794,8 @@ class FullGame(unittest.TestCase):
 
     def test_hunt_validation_snapshot_parallel_strike_and_reward(self):
         strongest = max(game.CARDS, key=lambda cid:game.CARDS[cid][3])
-        self.seed(owned={strongest:3})
+        slots = sorted(game.CARDS, key=lambda cid: game.CARDS[cid][3], reverse=True)[:6]
+        self.seed(owned=dict.fromkeys(slots, 1))
         board = self.run_play('state')[1]['state']['board']
         a, b = [q for q in board['notices'] if q['kind']=='hunt']
         contract = a['id']
@@ -783,11 +803,10 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('start-hunt', 2, contract=contract)[0], 409)
         for bad in ([None]*5, ['WIT_X00']+[None]*5, [strongest]*6, [{}]+[None]*5):
             self.assertEqual(self.run_play('save-deck', 3, slots=bad)[0], 400)
-        slots = [None]*3+[strongest]+[None]*2
         self.assertEqual(self.run_play('save-deck', 4, slots=slots)[0], 200)
         self.assertEqual(self.run_play('save-deck', 4, slots=[None]*6)[0], 409)
         _, out = self.run_play('start-hunt', 5, contract=contract)
-        self.assertEqual(out['state']['fight']['units'][3]['atk'], game.CARDS[strongest][3])
+        self.assertEqual(out['state']['fight']['units'][0]['atk'], game.CARDS[strongest][3])
         self.assertEqual(self.run_play('save-deck', 6, slots=[None]*6)[0], 200)
         self.assertEqual(self.run_play('start-hunt', 7, contract=contract)[0], 409)
         self.assertEqual(self.run_play('strike', 8, contract=contract, turn=True)[0], 400)
@@ -797,7 +816,7 @@ class FullGame(unittest.TestCase):
         last = next(out for code, out in results if code==200)
         self.assertEqual(self.run_play('state')[1]['state']['fight'], last['state']['fight'])
         if last['state']['fight']['status']=='active':
-            self.assertEqual(last['strike']['events'][-1]['slot'], 3)
+            self.assertEqual(last['strike']['events'][-1]['slot'], 3 if game.hunts.tactic(a['name']) == 'rear' else 0)
             _, last = self.run_play('strike', 11, contract=contract, turn=1)
         self.assertEqual(last['state']['fight']['status'], 'won')
         self.assertEqual(last['state']['coins'], 7+a['reward'])
@@ -806,6 +825,38 @@ class FullGame(unittest.TestCase):
         self.assertEqual(self.run_play('state')[1]['state']['coins'], 7+a['reward'])
         self.assertEqual(self.run_play('take-contract', 13, contract=contract)[0], 409)
         self.assertEqual(self.run_play('take-contract', 14, contract=b['id'])[0], 200)
+
+    def test_rebalanced_contracts_reward_deck_building_and_placement(self):
+        mixed = ['WIT_R18', 'WIT_C22', 'WIT_C28', 'WIT_L01', 'WIT_R03', 'WIT_R06']
+        cases = (
+            (1, 'Полуденница', [None]*3+['WIT_M01']+[None]*2, 'lost'),
+            (1, 'Полуденница', sorted(game.POOLS['C'])[:6], 'lost'),
+            (1, 'Полуденница', mixed, 'won'),
+            (1, 'Полуденница', mixed[3:]+mixed[:3], 'lost'),
+            (3, 'Ифрит', ['WIT_E18','WIT_R22','WIT_C12','WIT_E01','WIT_E14','WIT_R12'], 'won'),
+            (3, 'Брукса', ['WIT_R24','WIT_R11','WIT_C18','WIT_E13','WIT_E05','WIT_E10'], 'won'),
+            (3, 'Брукса', ['WIT_R09','WIT_R23','WIT_C07','WIT_E14','WIT_E10','WIT_E23'], 'lost'),
+        )
+        for tier, name, slots, expected in cases:
+            with self.subTest(tier=tier, name=name, slots=slots):
+                contract = dict(id='a', tier=tier, name=name, reward=3)
+                state = dict(owned=dict.fromkeys(filter(None, slots), 1), deck=slots, contract=contract, coins=0)
+                code, _ = game.hunts.action(state, game.CARDS, 'start-hunt', {'contract':'a'})
+                self.assertEqual(code, 200)
+                fight = state['fight']
+                for slot, cid in enumerate(slots):
+                    if cid:
+                        self.assertEqual((fight['units'][slot]['atk'], fight['units'][slot]['maxHp']),
+                                         tuple(game.CARDS[cid][3:5]))
+                self.assertEqual((fight['monster']['maxHp'], fight['monster']['atk']),
+                                 game.hunts.MONSTER_STATS[tier])
+                for turn in range(3):
+                    if fight['status'] != 'active':
+                        break
+                    # An in-progress fight must not look up cards in a changed catalog.
+                    code, _ = game.hunts.action(state, {}, 'strike', {'contract':'a','turn':turn})
+                    self.assertEqual(code, 200)
+                self.assertEqual((fight['status'], state['coins']), (expected, 3 if expected=='won' else 0))
 
     def test_strikes_front_first_and_third_round_win_or_loss(self):
         for hp, status in [(9, 'won'), (10, 'lost')]:
